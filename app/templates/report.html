@@ -1,0 +1,151 @@
+{%- macro dot(kind) -%}
+<span class="mk">{% if kind=='hit' %}<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="6" fill="#0a8f0a"/></svg>
+{%- elif kind=='miss' %}<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="#8b8b86" stroke-width="1.6"/></svg>
+{%- elif kind=='src' %}<svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5" fill="none" stroke="#8b8b86" stroke-width="1.6"/><circle cx="7" cy="7" r="2" fill="#0a8f0a"/></svg>
+{%- elif kind=='whit' %}<svg width="14" height="14" viewBox="0 0 14 14"><rect x="1" y="1" width="12" height="12" rx="2" fill="#0a8f0a"/></svg>
+{%- elif kind=='wmiss' %}<svg width="14" height="14" viewBox="0 0 14 14"><rect x="2" y="2" width="10" height="10" rx="2" fill="none" stroke="#8b8b86" stroke-width="1.6"/></svg>{% endif %}</span>
+{%- endmacro -%}
+{%- macro cell(a, web=false) -%}
+{%- if not a or a.status=='skipped' %}<span class="muted" title="nicht gemessen">–</span>
+{%- elif a.status=='error' %}<a class="cell" href="/answers/{{ a.id }}" title="Abfrage fehlgeschlagen" style="color:#c22f2f;font-weight:700">!</a>
+{%- elif web %}<a class="cell" href="/answers/{{ a.id }}" title="{{ 'Platz %d'|format(a.rank) if a.rank else 'nicht unter den ersten zehn' }}">{{ dot('whit' if a.rank else 'wmiss') }}{% if a.rank %}<span class="pos">{{ a.rank }}</span>{% endif %}</a>
+{%- else %}<a class="cell" href="/answers/{{ a.id }}" title="{{ 'genannt' if a.mentioned else ('nur als Quelle zitiert' if a.cited else 'nicht genannt') }}{{ ', Position %d'|format(a.rank) if a.rank }}{{ ', Website zitiert' if a.cited and a.mentioned }}">{{ dot('hit' if a.mentioned else ('src' if a.cited else 'miss')) }}{% if a.rank %}<span class="pos">{{ a.rank }}.</span>{% endif %}</a>
+{%- endif -%}
+{%- endmacro -%}
+{%- macro hclass(v) -%}{{ 'h0' if not v else ('h1' if v < 20 else ('h2' if v < 40 else ('h3' if v < 60 else 'h4'))) }}{%- endmacro -%}
+{%- set name = R.site.name -%}{%- set H = R.head -%}
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Peilung {{ name }} · {{ R.date|date }}</title><style>{{ css }}</style></head><body>
+{% if not pdf %}<div class="toolbar"><a href="/sites/{{ R.site.id }}">← {{ name }}</a><a href="/runs/{{ R.run.id }}/report.pdf">Als PDF öffnen</a><button onclick="window.print()">Drucken</button></div>{% endif %}
+<div class="sheet">
+
+<div class="cover">
+<div class="cover-top"><b>Peilung</b><span>{{ R.ref }} · {{ 'Erstmessung' if not R.prev else 'Prüfung %d'|format(R.seq) }} · {{ R.date|date }}</span></div>
+{% if R.demo %}<div class="banner">Demodaten: Alle Antworten in diesem Bericht sind simuliert und sagen nichts über die tatsächliche Sichtbarkeit aus.</div>{% endif %}
+{% if R.unmeasured %}<div class="banner">Nicht gemessen: {{ R.unmeasured|join(', ') }}. Diese Kanäle fehlen in allen Zahlen dieses Berichts.</div>{% endif %}
+<div class="kicker">Sichtbarkeit in KI-Modellen und Websuche</div>
+<h1>{{ name }}</h1>
+<p class="lead">{{ R.site.domain }} · {{ H.questions }} Fragen aus Sicht künftiger Kunden, jede gestellt an ChatGPT, Gemini, Perplexity, Claude, Copilot und eine Websuche.</p>
+<div class="hero">
+<div class="n">{{ H.ai[0] }} <small>von {{ H.ai[1] }}</small></div>
+<p><b>Antworten der KI-Modelle nennen {{ name }}</b>{% if H.ai[1] %} ({{ pct(H.ai[0], H.ai[1]) }} %){% endif %}.
+{% if H.brand[1] %}Ohne die Fragen nach der Marke selbst: {{ H.nb[0] }} von {{ H.nb[1] }}.{% endif %}
+{% if R.prev %}<br>Zur Vorprüfung vom {{ R.prev.started_at|date }}: {{ H.d_ai|delta(' Prozentpunkte') }}{% endif %}</p>
+</div>
+<div class="models">{% for m in R.models %}<div class="model {{ 'off' if not m.measured }}">
+<div class="name">{{ m.label }}</div>
+{% if m.measured %}<div class="rate">{{ m.rate }} %</div><div class="of">{{ m.hits }} von {{ m.total }}{{ ' in den Top 10' if m.kind=='web' }}</div>{% if R.prev %}<div>{{ m.delta|delta }}</div>{% endif %}
+{% else %}<div class="rate">–</div><div class="of">nicht gemessen</div>{% endif %}</div>{% endfor %}</div>
+<p class="fn">Trefferquote je Kanal: Anteil der Antworten, die {{ name }} nennen. Websuche: Anteil der Fragen, bei denen {{ R.site.domain }} unter den ersten zehn Treffern steht.{% if R.prev %} Veränderungen in Prozentpunkten (PP) gegenüber der Vorprüfung, gerechnet auf den {{ H.comparable }} Fragen, die in beiden Prüfungen im selben Wortlaut gestellt wurden.{% endif %}</p>
+</div>
+
+<section><div class="kicker">01</div><h2>Der Befund in Kürze</h2>
+<ul class="find">{% for f in R.findings %}<li>{{ f }}</li>{% endfor %}</ul>
+<div class="tiles">
+<div class="tile"><div class="v">{{ H.nb[0] }}<small>/{{ H.nb[1] }}</small></div><div class="l">Fachantworten der KI-Modelle nennen {{ name }}</div></div>
+{% if H.brand[1] %}<div class="tile"><div class="v">{{ H.brand[0] }}<small>/{{ H.brand[1] }}</small></div><div class="l">Antworten auf Fragen nach der Marke selbst</div></div>{% endif %}
+<div class="tile"><div class="v">{{ H.web[0] }}<small>/{{ H.web[1] }}</small></div><div class="l">Fragen mit {{ R.site.domain }} in den ersten zehn Treffern der Websuche</div></div>
+<div class="tile"><div class="v">{{ R.checks|selectattr('status','equalto','gut')|list|length }}<small>/{{ R.checks|length }}</small></div><div class="l">technische Prüfpunkte ohne Beanstandung</div></div>
+</div></section>
+
+<section><div class="kicker">02</div><h2>Veränderung zur Vorprüfung</h2>
+{% if not R.prev %}<p class="lead">Dies ist die erste Messung für {{ name }}. Ab der nächsten Prüfung zeigt dieser Abschnitt, was sich bewegt hat. Es werden dieselben Fragen gestellt, solange Sie sie nicht ändern.</p>
+{% else %}<p class="lead">Vergleich mit der Prüfung vom {{ R.prev.started_at|date }}. Grundlage der Veränderungswerte sind die {{ H.comparable }} von {{ H.questions }} Fragen, die unverändert in beiden Prüfungen gestellt wurden.</p>
+<div class="tiles">
+<div class="tile"><div class="v">{{ H.d_ai|delta }}</div><div class="l">KI-Modelle gesamt</div></div>
+<div class="tile"><div class="v">{{ H.d_nb|delta }}</div><div class="l">nur Fachfragen</div></div>
+<div class="tile"><div class="v">{{ H.d_web|delta }}</div><div class="l">Websuche, erste zehn Treffer</div></div>
+</div>
+{% if R.changes %}<h3>Änderungen am Fragenkatalog seit der Vorprüfung</h3>
+<table><tr><th style="width:90px">Datum</th><th style="width:230px">Änderung</th><th>Betroffen</th></tr>
+{% for c in R.changes %}<tr><td>{{ c.at|date }}</td><td><b>{{ c.label }}</b></td><td>{{ c.text }}</td></tr>{% endfor %}</table>
+<p class="fn">Geänderte Fragen beginnen eine neue Messreihe und sind unten mit „Neubeginn“ gekennzeichnet. Themenfelder mit Änderungen tragen den Hinweis „geändert“; ihre Werte sind mit der Vorprüfung nur eingeschränkt vergleichbar.</p>
+{% else %}<p class="fn">Fragenkatalog und Themenfelder sind seit der Vorprüfung unverändert.</p>{% endif %}{% endif %}</section>
+
+<section><div class="kicker">03</div><h2>Trefferquote je KI-Modell</h2>
+<p class="lead">Die Modelle recherchieren unterschiedlich und kommen zu verschiedenen Ergebnissen. Fachantworten sind Antworten auf Fragen, die {{ name }} nicht beim Namen nennen.</p>
+<div class="tw"><table><tr><th>KI-Modell</th><th style="width:26%">Fachantworten mit Nennung</th><th class="r"></th>{% if R.prev %}<th class="r">Veränderung</th>{% endif %}<th class="r">Website zitiert</th><th>Am häufigsten daneben genannt</th></tr>
+{% for m in R.ai_models %}<tr><td><b>{{ m.label }}</b></td>
+{% if m.measured %}<td><div class="bar own" style="margin-top:5px"><i style="width:{{ pct(m.hits_nb, m.total_nb) or 0 }}%"></i></div></td>
+<td class="r">{{ m.hits_nb }}/{{ m.total_nb }} · {{ pct(m.hits_nb, m.total_nb) }} %</td>{% if R.prev %}<td class="r">{{ m.delta|delta }}</td>{% endif %}
+<td class="r">{{ m.cites_own }}×</td><td>{{ m.top|join(', ') or '–' }}</td>
+{% else %}<td colspan="{{ 5 if R.prev else 4 }}" class="muted">nicht gemessen</td>{% endif %}</tr>{% endfor %}</table></div>
+{% if R.errors %}<p class="fn">{{ R.errors }} Abfragen sind trotz Wiederholung fehlgeschlagen und nicht in den Zahlen enthalten (in der Tabelle unten mit „!“ markiert).</p>{% endif %}</section>
+
+<section><div class="kicker">04</div><h2>Wo {{ name }} erscheint: jede Frage, jeder Kanal</h2>
+<div class="legend"><span>{{ dot('hit') }} genannt</span><span>{{ dot('src') }} nur als Quelle zitiert</span><span>{{ dot('miss') }} nicht genannt</span><span>{{ dot('whit') }} Websuche: unter den ersten zehn, mit Platz</span><span>{{ dot('wmiss') }} nicht unter den ersten zehn</span><span>Ziffer mit Punkt: Position unter den genannten Anbietern</span></div>
+<div class="tw"><table><tr><th style="width:40%">Frage</th>{% for c in R.channels %}<th class="c">{{ c.label }}</th>{% endfor %}<th class="r">KI gesamt</th>{% if R.prev %}<th class="r">Vorprüfung</th>{% endif %}</tr>
+{% for t in R.topics %}<tr class="grp"><td colspan="{{ 9 if R.prev else 8 }}">{{ t.name }}{% if t.notes %} <span class="flag">geändert</span>{% endif %}</td></tr>
+{% for q in R.questions if q.tid == t.id %}<tr><td><span class="code">{{ q.code }}</span> {{ q.text }}
+{%- if q.flag=='neu' %}<span class="flag">neu</span>{% elif q.flag=='neustart' %}<span class="flag">Neubeginn</span>{% endif %}{% if q.moved_from %}<span class="flag">verschoben aus „{{ q.moved_from }}“</span>{% endif %}</td>
+{% for c in R.channels %}<td class="c">{{ cell(q.cells.get(c.key), c.kind=='web') }}</td>{% endfor %}
+<td class="r"><b>{{ q.ai_hits }}/{{ q.ai_total }}</b></td>{% if R.prev %}<td class="r muted">{{ q.prev_hits or '–' }}</td>{% endif %}</tr>{% endfor %}{% endfor %}</table></div>
+{% if R.removed %}<p class="fn">Seit der Vorprüfung gestrichen: {% for q in R.removed %}{{ q.code }} „{{ q.text }}“{{ '; ' if not loop.last }}{% endfor %}.</p>{% endif %}
+<p class="fn">Je Frage und Kanal eine Abfrage. Einzelne Treffer schwanken von Tag zu Tag; belastbar ist das Muster über mehrere Fragen und Prüfungen.{% if not pdf %} Ein Klick auf ein Zeichen zeigt die Antwort im Wortlaut.{% endif %}</p></section>
+
+<section><div class="kicker">05</div><h2>Sichtbarkeit je Themenfeld</h2>
+<p class="lead">Anteil der KI-Antworten je Themenfeld, die {{ name }} nennen.</p>
+{% for t in R.topics %}<div class="barrow"><div><b>{{ t.name }}</b>{% if t.notes %} <span class="flag" title="{{ t.notes|join('; ') }}">geändert</span>{% endif %}<div class="small muted">{{ t.count }} Fragen{% if t.web[1] %} · Websuche {{ t.web[0] }}/{{ t.web[1] }}{% endif %}</div></div>
+<div class="bar {{ 'own' if not t.is_brand }}"><i style="width:{{ t.rate or 0 }}%"></i></div>
+<div class="val">{{ t.hits }}/{{ t.total }} · <b>{{ t.rate if t.rate is not none else '–' }} %</b>{% if R.prev %}<br>{{ t.delta|delta }}{% endif %}</div></div>{% endfor %}
+{% set noted = R.topics|selectattr('notes')|list %}{% if noted %}<p class="fn">Geänderte Themenfelder: {% for t in noted %}<b>{{ t.name }}</b> – {{ t.notes|join(', ') }}{{ '; ' if not loop.last }}{% endfor %}.</p>{% endif %}
+<p class="fn">Bei wenigen Fragen je Feld zeigt die Grafik eine Richtung, keine Statistik.</p></section>
+
+<section><div class="kicker">06</div><h2>Anbieteranteile je Themenfeld</h2>
+{% if R.vendors.analysed %}<p class="lead">Anteil der KI-Antworten eines Themenfelds, die den jeweiligen Anbieter nennen. Die Anbieter wurden automatisch aus den Antworten erkannt; Fragen nach der Marke selbst bleiben außen vor.</p>
+<div class="tw"><table class="heat"><tr><th>Anbieter</th>{% for t in R.vendors.topics %}<th class="c">{{ t.name }}{% if t.notes %}<br><span class="flag">geändert</span>{% endif %}<br><span style="font-weight:400;letter-spacing:0;text-transform:none">{{ t.n }} Antworten</span></th>{% endfor %}<th class="r">Gesamt</th></tr>
+{% for r in R.vendors.rows %}<tr class="{{ 'own' if r.self }}"><td>{{ r.name }}</td>
+{% for c in r.cells %}<td class="h {{ hclass(c.share) }}"><b>{{ c.share }} %</b>{% if R.prev %}<span class="dd">{{ '%+d PP'|format(c.delta) if c.delta is not none and c.delta != 0 else ('±0' if c.delta == 0 else 'neu') }}</span>{% endif %}</td>{% endfor %}
+<td class="r">{{ r.share }} %</td></tr>{% endfor %}</table></div>
+<p class="fn">Je dunkler das Feld, desto höher der Anteil. {% if R.prev %}Kleine Zahl: Veränderung zur Vorprüfung in Prozentpunkten. {% endif %}Gezeigt sind die am häufigsten genannten Anbieter{% if R.vendors.others %}; {{ R.vendors.others }} weitere mit wenigen Nennungen sind nicht aufgeführt{% endif %}. Die Liste lässt sich je Website bereinigen.</p>
+<h3>Wer am häufigsten genannt wird</h3>
+{% for r in R.vendors.ranking %}<div class="barrow"><div>{% if r.self %}<b>{{ r.name }}</b>{% else %}{{ r.name }}{% endif %}</div>
+<div class="bar {{ 'own' if r.self }}"><i style="width:{{ r.share or 0 }}%"></i></div><div class="val">{{ r.total }}/{{ R.vendors.n }} · {{ r.share }} %</div></div>{% endfor %}
+<p class="fn">Anteil an den {{ R.vendors.n }} ausgewerteten Fachantworten aller KI-Modelle. Blau: {{ name }}.</p>
+{% else %}<p class="lead">Für diese Prüfung liegt keine Anbieterauswertung vor, weil kein Auswertungsmodell eingerichtet war oder keine Fachantworten vorliegen.</p>{% endif %}</section>
+
+<section><div class="kicker">07</div><h2>Quellen, auf die sich die Antworten stützen</h2>
+{% if R.sources %}<p class="lead">Websites, die die KI-Modelle in ihren Fachantworten am häufigsten als Quelle angeben. Wer dort steht, wird eher genannt.</p>
+<table><tr><th>Quelle</th><th class="r">Antworten</th><th class="r">davon mit {{ name }}</th><th>Einordnung</th></tr>
+{% for s in R.sources %}<tr><td><b>{{ s.domain }}</b></td><td class="r">{{ s.count }}</td><td class="r">{{ s.with_us }}</td>
+<td>{{ 'eigene Website' if s.own else ('zitiert, ohne dass ' ~ name ~ ' genannt wird: Eintrag oder Erwähnung prüfen' if s.with_us == 0 else 'fremde Seite') }}</td></tr>{% endfor %}</table>
+<p class="fn">Grundlage: {{ R.n_src }} Fachantworten mit Quellenangabe. Nicht jedes Modell weist seine Quellen in derselben Form aus.</p>
+{% else %}<p class="lead">Die Antworten dieser Prüfung enthalten keine auswertbaren Quellenangaben.</p>{% endif %}</section>
+
+<section><div class="kicker">08</div><h2>Technische Prüfung der Website</h2>
+<p class="lead">Suchmaschinen und KI-Modelle lesen dieselben Seiten. Geprüft wurden {{ R.pages }} Seiten.</p>
+<table><tr><th style="width:190px">Prüfpunkt</th><th>Befund</th><th style="width:110px">Bewertung</th></tr>
+{% for c in R.checks %}<tr><td><b>{{ c.label }}</b></td><td>{{ c.finding }}{% if c.examples and c.status!='gut' %}<div class="small muted">z. B. {{ c.examples[:3]|join(' · ') }}</div>{% endif %}</td>
+<td><span class="st {{ c.status }}">{{ {'gut':'✓ gut','teilweise':'– teilweise','fehlt':'✕ fehlt'}[c.status] }}</span>{% if c.prev %}<div class="small muted">vorher: {{ c.prev }}</div>{% endif %}</td></tr>{% endfor %}</table></section>
+
+<section><div class="kicker">09</div><h2>Empfehlungen nach Priorität</h2>
+<p class="lead">{{ R.recs|length }} Maßnahmen, geordnet nach erwarteter Wirkung und Aufwand. Jede nennt den Beleg aus dieser Messung.</p>
+{% for r in R.recs %}<div class="rec"><div class="no">{{ r.prio }}</div><div>
+<h3>{{ r.title }}</h3><div class="meta">Wirkung {{ r.level }} · Aufwand etwa {{ r.effort }} · Wo: {{ r.place }}</div>
+<p><b>Beleg:</b> {{ r.evidence }}</p><p>{{ r.action }}</p>
+{% if r.draft %}<div class="draft"><b>Textvorschlag · Angaben in spitzen Klammern bitte prüfen</b>{{ r.draft }}</div>{% endif %}</div></div>{% endfor %}</section>
+
+<section><div class="kicker">10</div><h2>Verlauf</h2>
+{% if R.trends.labels|length < 2 %}<p class="lead">Nach der zweiten Prüfung zeigen die Grafiken hier die Entwicklung je Kanal und Themenfeld.</p>{% else %}
+<p class="lead">Trefferquote in Prozent über alle {{ R.trends.labels|length }} Prüfungen seit {{ R.trends.labels[0]|date }}.</p>{% endif %}
+<h3>Je Kanal</h3><div class="charts">
+<div class="chartbox"><div class="t">KI-Modelle gesamt</div>{{ linechart(R.trends.overall, R.trends.labels, R.trends.changed) }}</div>
+{% for c in R.trends.channels %}<div class="chartbox"><div class="t">{{ c.label }}</div>{{ linechart(c['values'], R.trends.labels, R.trends.changed) }}</div>{% endfor %}</div>
+<h3>Je Themenfeld (KI-Modelle)</h3><div class="charts">
+{% for t in R.trends.topics %}<div class="chartbox"><div class="t">{{ t.name }}</div>{{ linechart(t['values'], R.trends.labels, R.trends.changed) }}</div>{% endfor %}</div>
+<p class="fn">Skala jeweils 0 bis 100 %. Raute unter der Achse: In dieser Prüfung war der Fragenkatalog gegenüber der vorigen geändert.</p>
+{% if R.trends.labels|length > 1 %}<details><summary class="small">Werte als Tabelle</summary><div class="tw"><table><tr><th>Reihe</th>{% for l in R.trends.labels %}<th class="r">{{ l|date }}</th>{% endfor %}</tr>
+<tr><td>KI-Modelle gesamt</td>{% for v in R.trends.overall %}<td class="r">{{ v if v is not none else '–' }}</td>{% endfor %}</tr>
+{% for c in R.trends.channels + R.trends.topics %}<tr><td>{{ c.label or c.name }}</td>{% for v in c['values'] %}<td class="r">{{ v if v is not none else '–' }}</td>{% endfor %}</tr>{% endfor %}</table></div></details>{% endif %}</section>
+
+<section><div class="kicker">11</div><h2>So wurde gemessen</h2>
+<p>Jede der {{ H.questions }} Fragen wurde am {{ R.date|date }} einmal an jedes der fünf KI-Modelle und an eine Websuche gestellt. ChatGPT, Gemini, Perplexity und Claude wurden über die Schnittstellen der Hersteller mit eingeschalteter Websuche befragt; ihre Antworten können von denen der Apps abweichen. Die Websuche ist eine unabhängige Suche und steht als Annäherung, nicht für Google.</p>
+<p>Als Treffer zählt eine Antwort, wenn sie {{ name }} in einer der hinterlegten Schreibweisen ({{ R.site.aliases_list|join(', ') if R.site.aliases_list else name }}) oder die Domain nennt. Bei der Websuche zählt, ob {{ R.site.domain }} unter den ersten zehn Treffern steht. Die Fragen wurden aus dem Inhalt der Website abgeleitet und bleiben von Prüfung zu Prüfung gleich, solange sie nicht ausdrücklich geändert werden.</p></section>
+
+<section><div class="kicker">Anhang</div><h2>Alle Fragen</h2>
+<table><tr><th>Nr.</th><th>Themenfeld</th><th>Frage</th><th class="r">KI</th><th class="r">Websuche</th></tr>
+{% for q in R.questions %}<tr><td class="code">{{ q.code }}</td><td>{{ q.topic }}</td><td>{{ q.text }}{% if q.lang=='en' %} <span class="muted small">(englisch)</span>{% endif %}{% if q.flag=='neustart' %}<span class="flag">Neubeginn</span>{% elif q.flag=='neu' %}<span class="flag">neu</span>{% endif %}</td>
+<td class="r">{{ q.ai_hits }}/{{ q.ai_total }}</td><td class="r">{{ ('Platz %d'|format(q.web_rank) if q.web_rank else 'nicht in Top 10') if q.web_ok else '–' }}</td></tr>{% endfor %}</table>
+<p class="fn">{{ R.ref }} · erstellt mit Peilung {{ version }} · nur für den internen Gebrauch.</p></section>
+</div></body></html>

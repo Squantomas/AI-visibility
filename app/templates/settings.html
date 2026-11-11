@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% block main %}
+<h1>Kanäle &amp; Einstellungen</h1>
+<p class="sub">Die Zugangsschlüssel stehen in der Datei <code>.env</code> im Programmordner (Vorlage: <code>.env.example</code>). Nach einer Änderung das Programm neu starten.</p>
+<div class="card tw"><table><tr><th>Kanal</th><th>Status</th><th>Hinweis</th><th></th></tr>
+{% for c in channels %}<tr><td><b>{{ c.label }}</b></td>
+<td>{% if status[c.key][0] %}<span class="pill ok">messbereit</span>{% else %}<span class="pill bad">nicht eingerichtet</span>{% endif %}</td>
+<td>{{ status[c.key][1] }}</td>
+<td><button onclick="test('{{ c.key }}', this)" {{ 'disabled' if not status[c.key][0] }}>Testabfrage</button> <span class="small" id="t-{{ c.key }}" aria-live="polite"></span></td></tr>{% endfor %}
+</table></div>
+<div class="card"><h3>Auswertung</h3>
+<p style="margin:0">{% if demo() %}Im Demo-Modus werden Fragen aus einfachen Vorlagen gebildet und Antworten simuliert.
+{% elif analysis %}Fragen ableiten, Anbieter erkennen und Empfehlungen ausformulieren übernimmt: <b>{{ analysis }}</b>.
+{% else %}<span class="pill bad">kein Modell eingerichtet</span> Ohne Schlüssel für mindestens ein KI-Modell werden Fragen nur aus einfachen Vorlagen gebildet und Anbieter nicht erkannt.{% endif %}</p></div>
+<div class="card"><h3>Hinweise zu den Kanälen</h3><ul style="margin:0;padding-left:20px">
+<li>ChatGPT, Gemini, Perplexity und Claude werden über die Schnittstellen der Hersteller mit eingeschalteter Websuche befragt. Die Antworten können von denen der Apps abweichen.</li>
+<li>Microsoft Copilot bietet keine öffentliche Schnittstelle. Der Kanal steuert die Weboberfläche fern (experimentell) und kann bei Änderungen der Oberfläche ausfallen. Bitte die Nutzungsbedingungen von Microsoft prüfen.</li>
+<li>Die Websuche ist eine unabhängige Suche als Annäherung, nicht Google.</li></ul></div>
+{% endblock %}{% block script %}<script>
+function test(key, btn) { var out = document.getElementById('t-' + key); out.textContent = 'läuft …'; btn.disabled = true;
+  fetch('/api/channels/' + key + '/test', {method: 'POST'}).then(function (r) { return r.json(); }).then(function (d) {
+    out.textContent = d.ok ? 'OK · ' + d.citations + ' Quellen · „' + d.text.slice(0, 90) + '…“' : 'Fehler: ' + d.error; btn.disabled = false; });
+}</script>{% endblock %}

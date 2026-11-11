@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block main %}
+<p class="small"><a href="/runs/{{ r.id }}/report">← Bericht vom {{ r.started_at|date }}</a></p>
+<h1>{{ channel_label[a.channel] }} · Frage {{ q.code }}</h1><p class="sub">{{ q.text }}</p>
+<p>{% if a.status!='ok' %}<span class="pill bad">{{ 'nicht gemessen' if a.status=='skipped' else 'Abfrage fehlgeschlagen' }}</span> {{ a.error }}
+{% elif a.mentioned %}<span class="pill ok">{{ s.name }} {{ 'unter den ersten zehn, Platz %d'|format(a.rank) if a.channel=='web' else 'wird genannt' }}</span>
+{% else %}<span class="pill">{{ s.name }} {{ 'nicht unter den ersten zehn' if a.channel=='web' else 'wird nicht genannt' }}</span>{% endif %}
+{% if a.cited and a.channel!='web' %}<span class="pill ok">{{ s.domain }} als Quelle zitiert</span>{% endif %}
+{% if a.rank and a.channel!='web' %}<span class="pill">Position {{ a.rank }} unter den genannten Anbietern</span>{% endif %}</p>
+{% if a.text %}<h2>{{ 'Treffer' if a.channel=='web' else 'Antwort im Wortlaut' }}</h2><pre class="answer">{{ a.text }}</pre>{% endif %}
+{% if vendors %}<h2>Erkannte Anbieter</h2><p>{{ vendors|join(' · ') }}</p>{% endif %}
+{% if cites and a.channel!='web' %}<h2>Quellen</h2><ul>{% for c in cites %}<li><a href="{{ c }}" target="_blank" rel="noopener noreferrer">{{ c }}</a></li>{% endfor %}</ul>{% endif %}
+{% endblock %}

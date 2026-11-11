@@ -1,0 +1,8 @@
+<p class="small"><a href="/">← Alle Websites</a></p>
+<h1>{{ s.name or s.domain }}</h1>
+<p class="sub"><a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.domain }}</a> · {{ intervals[s.interval] }}{% if s.next_run_at %} · nächste Prüfung {{ s.next_run_at|date }}{% endif %}</p>
+<nav class="tabs">
+<a href="/sites/{{ s.id }}" class="{{ 'on' if tab=='overview' }}">Prüfungen &amp; Berichte</a>
+<a href="/sites/{{ s.id }}/questions" class="{{ 'on' if tab=='questions' }}">Fragen &amp; Themenfelder</a>
+<a href="/sites/{{ s.id }}/vendors" class="{{ 'on' if tab=='vendors' }}">Anbieter</a>
+</nav>

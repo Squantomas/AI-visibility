@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% block title %}{{ s.name or s.domain }} – Peilung{% endblock %}{% block main %}
+{% include "_sitehead.html" %}
+{% if s.state=='analysing' %}<p class="note" id="wait">Die Website wird eingelesen und der Fragenvorschlag erstellt. Das dauert meist ein bis zwei Minuten; die Seite lädt von selbst neu.</p>
+{% elif s.state=='error' %}<div class="note err">Die Website konnte nicht eingelesen werden: {{ s.state_msg }}
+<form method="post" action="/sites/{{ s.id }}/reanalyse" style="margin-top:8px"><button>Erneut versuchen</button></form></div>
+{% elif s.state=='draft' and not runs %}<p class="note">Der Fragenvorschlag liegt vor: {{ nq }} Fragen. <a href="/sites/{{ s.id }}/questions">Fragen prüfen und anpassen</a>, dann die erste Messung starten.</p>{% endif %}
+{% if s.profile_data.note %}<p class="note warn">{{ s.profile_data.note }}</p>{% endif %}
+{% if missing and s.state!='analysing' %}<p class="note warn">Nicht messbereit: {{ missing|join(', ') }}. Eine Messung läuft trotzdem; diese Kanäle fehlen dann im Bericht.</p>{% endif %}
+<div class="card"><div class="row"><div class="grow"><h3>Prüfungen</h3><span class="muted small">{{ nq }} aktive Fragen · jede geht an fünf KI-Modelle und die Websuche</span></div>
+{% if s.state in ('draft','active') %}<form method="post" action="/sites/{{ s.id }}/run"><button class="primary">Messung jetzt starten</button></form>{% endif %}</div>
+{% if runs %}<div class="tw"><table style="margin-top:10px"><tr><th>Datum</th><th>Auslöser</th><th>Status</th><th class="num">KI-Trefferquote</th><th class="num">Websuche Top 10</th><th></th></tr>
+{% for r in runs %}<tr><td>{{ (r.started_at or r.queued_at)|date(true) }}</td>
+<td>{{ {'manual':'von Hand','schedule':'Rhythmus','auto':'automatisch'}[r.trigger] }}{% if r.mode=='demo' %} <span class="pill">Demo</span>{% endif %}</td>
+<td>{% if r.status=='done' %}<span class="pill ok">abgeschlossen</span>{% elif r.status=='failed' %}<span class="pill bad" title="{{ r.error }}">fehlgeschlagen</span>{% else %}<span class="pill run">{{ 'wartet' if r.status=='queued' else 'läuft · %d %%'|format(r.progress) }}</span>{% endif %}</td>
+<td class="num">{% if r.k and r.k.ai is not none %}<b>{{ r.k.ai }} %</b> <span class="muted small">({{ r.k.h }}/{{ r.k.t }})</span>{% else %}–{% endif %}</td>
+<td class="num">{{ r.k.web if r.k else '–' }}</td>
+<td>{% if r.status=='done' %}<a href="/runs/{{ r.id }}/report">Bericht</a> · <a href="/runs/{{ r.id }}/report.pdf">PDF</a>{% else %}<a href="/runs/{{ r.id }}">Ansehen</a>{% endif %}</td></tr>{% endfor %}
+</table></div>{% endif %}</div>
+<div class="card"><h3>Einstellungen</h3>
+<form method="post" action="/sites/{{ s.id }}/settings"><div class="row">
+<label>Name<br><input type="text" name="name" value="{{ s.name }}" required></label>
+<label>Wiederholung<br><select name="interval">{% for k, v in intervals.items() %}<option value="{{ k }}" {{ 'selected' if k==s.interval }}>{{ v }}</option>{% endfor %}</select></label>
+<label class="grow">Schreibweisen der Marke (durch Komma getrennt)<br><input type="text" name="aliases" value="{{ s.aliases_list|join(', ') }}"></label>
+<button style="align-self:flex-end">Speichern</button></div>
+<p class="small muted" style="margin:8px 0 0">Eine Antwort zählt als Treffer, wenn sie eine dieser Schreibweisen oder die Domain nennt. Umlaute werden in allen Varianten erkannt (ö, oe, o). Änderungen gelten rückwirkend für alle Prüfungen.</p></form></div>
+<form method="post" action="/sites/{{ s.id }}/delete" data-confirm="Website mit allen Fragen, Prüfungen und Berichten endgültig löschen?"><button class="link danger">Website löschen</button></form>
+{% endblock %}{% block script %}{% if s.state=='analysing' %}<script>poll('/api/sites/{{ s.id }}', function (d) { if (d.state !== 'analysing') { location.reload(); return true; } });</script>{% endif %}{% endblock %}

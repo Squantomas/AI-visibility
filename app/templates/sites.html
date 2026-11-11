@@ -1,0 +1,26 @@
+{% extends "base.html" %}{% block main %}
+<h1>Websites</h1>
+<p class="sub">Sichtbarkeit in fünf KI-Modellen und der Websuche. In diesem Monat: {{ usage.n }} abgeschlossene Prüfungen für {{ usage.s }} Websites.</p>
+{% if missing %}<p class="note warn">Nicht messbereit: {{ missing|join(', ') }}. Diese Kanäle erscheinen im Bericht als „nicht gemessen“. <a href="/settings">Einstellungen ansehen</a></p>{% endif %}
+<div class="card"><h3>Neue Website</h3>
+<form method="post" action="/sites"><div class="row">
+<div class="grow"><input type="text" name="url" placeholder="www.beispiel.de" required aria-label="Adresse der Website"></div>
+<input type="text" name="name" placeholder="Name (optional)" aria-label="Name">
+<select name="interval" aria-label="Rhythmus">{% for k, v in intervals.items() %}<option value="{{ k }}" {{ 'selected' if k=='monthly' }}>{{ v }}</option>{% endfor %}</select>
+<button class="primary">Website einlesen</button></div>
+<p class="small muted" style="margin:10px 0 0"><label><input type="checkbox" name="auto_start" value="1"> Fragen ohne Durchsicht übernehmen und sofort messen</label>
+ · Sonst schlägt das Werkzeug etwa 20 Fragen vor, die Sie vor der ersten Messung ändern können.</p></form></div>
+{% if sites %}<div class="card tw"><table>
+<tr><th>Website</th><th>Letzte Prüfung</th><th class="num">KI-Trefferquote</th><th>Veränderung</th><th class="num">Websuche Top 10</th><th>Rhythmus</th><th>Nächste Prüfung</th><th></th></tr>
+{% for s in sites %}<tr>
+<td><a href="/sites/{{ s.id }}"><b>{{ s.name or s.domain }}</b></a><br><span class="small muted">{{ s.domain }}</span></td>
+<td>{% if s.open %}<a class="pill run" href="/runs/{{ s.open.id }}">läuft · {{ s.open.progress }} %</a>
+{% elif s.last %}<a href="/runs/{{ s.last.id }}/report">{{ s.last.started_at|date }}</a>
+{% elif s.state=='analysing' %}<span class="pill run">wird eingelesen</span>
+{% elif s.state=='error' %}<span class="pill bad">Fehler</span>{% else %}<a class="pill" href="/sites/{{ s.id }}/questions">Fragen prüfen</a>{% endif %}</td>
+<td class="num">{% if s.k and s.k.ai is not none %}<span class="big">{{ s.k.ai }} %</span><br><span class="small muted">{{ s.k.h }} von {{ s.k.t }}</span>{% else %}–{% endif %}</td>
+<td>{{ s.dlt|delta }}</td><td class="num">{{ s.k.web if s.k else '–' }}</td>
+<td>{{ intervals[s.interval] }}</td><td>{{ s.next_run_at|date }}</td>
+<td><a href="/sites/{{ s.id }}">Öffnen</a></td></tr>{% endfor %}
+</table></div>{% else %}<p class="muted">Noch keine Website angelegt.</p>{% endif %}
+{% endblock %}

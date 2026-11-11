@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block main %}
+<p class="small"><a href="/sites/{{ s.id }}">← {{ s.name }}</a></p><h1>Messung läuft</h1>
+<div class="card" aria-live="polite"><p id="step">{{ r.step or 'Wartet auf den Start' }}</p>
+<div class="bar" style="height:14px"><i id="bar" style="width:{{ r.progress }}%"></i></div>
+<p class="small muted" style="margin-bottom:0">Die Messung läuft im Hintergrund weiter, auch wenn Sie diese Seite schließen.</p></div>
+<div id="fail" class="note err" {{ 'hidden' if r.status!='failed' }}>Die Messung ist fehlgeschlagen: <span id="err">{{ r.error }}</span>
+<form method="post" action="/runs/{{ r.id }}/retry" style="margin-top:8px"><button>Erneut versuchen</button></form></div>
+{% endblock %}{% block script %}<script>
+poll('/api/runs/{{ r.id }}', function (d) {
+  document.getElementById('bar').style.width = d.progress + '%';
+  document.getElementById('step').textContent = d.step || (d.status === 'queued' ? 'Wartet auf den Start' : '');
+  if (d.status === 'done') { location.href = '/runs/{{ r.id }}/report'; return true; }
+  if (d.status === 'failed') { document.getElementById('fail').hidden = false; document.getElementById('err').textContent = d.error; return true; }
+});</script>{% endblock %}

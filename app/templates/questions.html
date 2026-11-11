@@ -1,0 +1,30 @@
+{% extends "base.html" %}{% block title %}Fragen – {{ s.name }}{% endblock %}{% block main %}
+{% include "_sitehead.html" %}
+{% if s.state=='analysing' %}<p class="note">Der Fragenvorschlag wird gerade erstellt.</p>{% else %}
+<p class="sub">{{ nq }} Fragen in {{ topics|length }} Themenfeldern{% if s.profile_data.method=='einfach' %} · ohne KI-Analyse abgeleitet (einfache Vorlagen){% endif %}.
+{% if measured %}Bei jeder Wiederholung werden dieselben Fragen gestellt. <b>Ein geänderter Wortlaut beginnt den Verlauf der Frage neu</b>; Änderungen an Fragen und Feldern kennzeichnet der nächste Bericht.{% else %}Vor der ersten Messung können Sie frei ändern, ergänzen und streichen.{% endif %}</p>
+{% for t in topics %}<div class="card">
+<form method="post" action="/topics/{{ t.id }}" class="row" style="margin-bottom:8px">
+<input type="text" name="name" value="{{ t.name }}" style="font-weight:600" aria-label="Name des Themenfelds" required>
+<select name="merge_into" aria-label="Zusammenlegen mit"><option value="">– nicht zusammenlegen –</option>{% for o in topics if o.id != t.id %}<option value="{{ o.id }}">aufgehen in „{{ o.name }}“</option>{% endfor %}</select>
+<button>Feld speichern</button><span class="muted small">{{ t.questions|length }} Fragen</span></form>
+{% for q in t.questions %}<form method="post" action="/questions/{{ q.id }}" class="qrow" data-measured="{{ 1 if measured else 0 }}">
+<span class="code">{{ q.code }}</span>
+<input type="text" name="text" value="{{ q.text }}" data-orig="{{ q.text }}" aria-label="Frage {{ q.code }}" required>
+{% if q.is_brand %}<span class="pill">Markenfrage</span>{% endif %}
+<select name="topic_id" aria-label="Themenfeld">{% for o in topics %}<option value="{{ o.id }}" {{ 'selected' if o.id==t.id }}>{{ o.name }}</option>{% endfor %}</select>
+<button>Speichern</button>
+<button class="link danger" formaction="/questions/{{ q.id }}/delete" data-confirm="Frage streichen? Sie wird ab der nächsten Prüfung nicht mehr gestellt.">Streichen</button>
+</form>{% else %}<p class="muted small">Keine Fragen in diesem Feld.</p>{% endfor %}
+</div>{% endfor %}
+<div class="card"><h3>Frage ergänzen</h3>
+<form method="post" action="/sites/{{ s.id }}/questions" class="row">
+<div class="grow"><input type="text" name="text" placeholder="Wer liefert … ?" required aria-label="Neue Frage"></div>
+<select name="topic_id" aria-label="Themenfeld"><option value="">Feld automatisch wählen</option>{% for o in topics %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select>
+<label class="small"><input type="checkbox" name="is_brand" value="1"> nennt die Marke</label>
+<button class="primary">Ergänzen</button></form>
+<h3 style="margin-top:18px">Themenfeld anlegen</h3>
+<form method="post" action="/sites/{{ s.id }}/topics" class="row"><input type="text" name="name" placeholder="Name des Felds" required aria-label="Neues Themenfeld"><button>Anlegen</button></form></div>
+<div class="row">{% if s.state in ('draft','active') %}<form method="post" action="/sites/{{ s.id }}/run"><button class="primary">{{ 'Messung jetzt starten' if measured else 'Erste Messung starten' }}</button></form>{% endif %}
+{% if not measured %}<form method="post" action="/sites/{{ s.id }}/reanalyse" data-confirm="Alle Fragen verwerfen und einen neuen Vorschlag erstellen?"><button>Neuen Vorschlag erstellen</button></form>{% endif %}</div>
+{% endif %}{% endblock %}

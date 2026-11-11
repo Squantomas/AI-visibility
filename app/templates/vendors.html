@@ -1,0 +1,19 @@
+{% extends "base.html" %}{% block title %}Anbieter – {{ s.name }}{% endblock %}{% block main %}
+{% include "_sitehead.html" %}
+<p class="sub">Anbieter, die das Werkzeug in den Antworten erkannt hat. Bereinigen Sie die Liste: doppelte Schreibweisen zusammenlegen, Unpassendes ausblenden. Die Bereinigung gilt für alle Berichte dieser Website, auch rückwirkend.</p>
+{% if vendors %}<div class="card tw"><table>
+<tr><th>Anbieter</th><th class="num">Nennungen</th><th>Umbenennen</th><th>Zusammenlegen mit</th><th></th></tr>
+{% for v in vendors %}<tr style="{{ 'opacity:.55' if v.hidden }}">
+<td><b>{{ v.name }}</b>{% if v.hidden %} <span class="pill">ausgeblendet</span>{% endif %}
+{% if v.aliases %}<br><span class="small muted">enthält: {{ v.aliases|join(', ') }}</span>
+<form method="post" action="/vendors/{{ v.id }}" style="display:inline"><input type="hidden" name="action" value="unmerge"><button class="link small">trennen</button></form>{% endif %}</td>
+<td class="num">{{ v.n }}</td>
+<td><form method="post" action="/vendors/{{ v.id }}" class="row"><input type="hidden" name="action" value="rename"><input type="text" name="name" value="{{ v.name }}" size="18" aria-label="Neuer Name"><button>OK</button></form></td>
+<td><form method="post" action="/vendors/{{ v.id }}" class="row"><input type="hidden" name="action" value="merge">
+<select name="target" aria-label="Ziel"><option value="">–</option>{% for o in vendors if o.id != v.id and not o.hidden %}<option value="{{ o.id }}">{{ o.name }}</option>{% endfor %}</select><button>OK</button></form></td>
+<td><form method="post" action="/vendors/{{ v.id }}" class="row">
+<button name="action" value="{{ 'show' if v.hidden else 'hide' }}" class="link">{{ 'Einblenden' if v.hidden else 'Ausblenden' }}</button>
+{% if not v.hidden %}<button name="action" value="own" class="link" data-confirm="„{{ v.name }}“ als Schreibweise der eigenen Marke übernehmen? Die Treffer aller Prüfungen werden neu bestimmt.">Ist unsere Marke</button>{% endif %}</form></td>
+</tr>{% endfor %}</table></div>
+{% else %}<p class="muted">Noch keine Anbieter erkannt. Die Liste füllt sich mit der ersten Messung.</p>{% endif %}
+{% endblock %}
