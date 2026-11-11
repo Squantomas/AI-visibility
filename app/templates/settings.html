@@ -14,6 +14,8 @@
 <div class="card"><h3>Hinweise zu den Kanälen</h3><ul style="margin:0;padding-left:20px">
 <li>ChatGPT, Gemini, Perplexity und Claude werden über die Schnittstellen der Hersteller mit eingeschalteter Websuche befragt. Die Antworten können von denen der Apps abweichen.</li>
 <li>Über OpenRouter gewählte Modelle (Spalte „Kanal“ zeigt die Modellkennung) werden mit dem Server-Tool <code>openrouter:web_search</code> befragt. Auswahl und Kostenschätzung: <code>python openrouter_config.py</code>.</li>
+<li>„Claude (Abo)“ befragt Claude über die Kommandozeile von Claude Code mit Ihrem Claude-Abo (einschalten mit <code>CLAUDE_CODE_MODE=on</code>). Die Abfragen zählen gegen die Nutzungsgrenzen des Abos.</li>
+<li>„Google KI-Übersicht“ stellt die Fragen in Ihrem eigenen Chrome und liest die KI-Übersicht über den Treffern aus (einschalten mit <code>GOOGLE_AI_MODE=on</code>; Chrome muss mit Fernsteuerung laufen, siehe README).</li>
 <li>Microsoft Copilot bietet keine öffentliche Schnittstelle. Der Kanal steuert die Weboberfläche fern (experimentell) und kann bei Änderungen der Oberfläche ausfallen. Bitte die Nutzungsbedingungen von Microsoft prüfen.</li>
 <li>Die Websuche ist eine unabhängige Suche als Annäherung, nicht Google.</li></ul></div>
 {% endblock %}{% block script %}<script>

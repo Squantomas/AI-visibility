@@ -168,7 +168,7 @@ def _ask_all(run_id, site, qs, status):
             for qu, _ in todo:
                 store(qu, channel, "skipped", error=status[channel][1])
             return
-        workers = 1 if channel in ("copilot", "web") else 3
+        workers = 1 if channel in ("copilot", "google_ai", "web") else (2 if channel == "claudecode" else 3)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             list(pool.map(one, todo))
 

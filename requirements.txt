@@ -7,3 +7,4 @@ anthropic>=2.8
 # Optional: PDF-Export und Copilot-Kanal (danach: playwright install chromium)
 # playwright>=1.45
 python-multipart>=0.0.9
+websocket-client>=1.8  # Kanal Google KI-Übersicht

@@ -1,6 +1,7 @@
 """Konfiguration aus Umgebungsvariablen bzw. der Datei .env."""
 import os
 import re
+import shutil
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -55,10 +56,12 @@ CHANNELS = [
     {"key": "gemini", "label": "Gemini", "kind": "ai"},
     {"key": "perplexity", "label": "Perplexity", "kind": "ai"},
     {"key": "claude", "label": "Claude", "kind": "ai"},
+] + ([{"key": "claudecode", "label": "Claude (Abo)", "kind": "ai"}] if env("CLAUDE_CODE_MODE", "off") == "on" else []) + [
     {"key": "copilot", "label": "Copilot", "kind": "ai"},
-] + [{"key": openrouter_key(m), "label": m, "kind": "ai", "model": m} for m in openrouter_models()] + [
-    {"key": "web", "label": "Websuche", "kind": "web"},
-]
+] + ([{"key": "google_ai", "label": "Google KI-Übersicht", "kind": "ai"}]
+     if env("GOOGLE_AI_MODE", "off") in ("extension", "on") else []) \
+  + [{"key": openrouter_key(m), "label": m, "kind": "ai", "model": m} for m in openrouter_models()] \
+  + ([] if env("SEARCH_PROVIDER", "duckduckgo") == "off" else [{"key": "web", "label": "Websuche", "kind": "web"}])
 OPENROUTER_CHANNELS = {c["key"]: c["model"] for c in CHANNELS if "model" in c}
 AI_CHANNELS = [c["key"] for c in CHANNELS if c["kind"] == "ai"]
 CHANNEL_LABEL = {c["key"]: c["label"] for c in CHANNELS}
@@ -79,15 +82,32 @@ def channel_status():
     for key in OPENROUTER_CHANNELS:
         s[key] = (True, f"über OpenRouter, Websuche {env('OPENROUTER_SEARCH_ENGINE', 'auto')}") \
             if env("OPENROUTER_API_KEY") else (False, "OPENROUTER_API_KEY fehlt")
+    if "claudecode" in CHANNEL_LABEL:
+        s["claudecode"] = (True, f"Claude Code mit Ihrem Abo, Modell {env('CLAUDE_CODE_MODEL') or 'Standard des Kontos'}") \
+            if claude_code_path() else (False, "Programm claude nicht gefunden (CLAUDE_CODE_PATH)")
     mode = env("COPILOT_MODE", "off")
     s["copilot"] = (True, "Browser-Fernsteuerung (experimentell)") if mode == "browser" else (
         False, "COPILOT_MODE=off")
+    if "google_ai" in CHANNEL_LABEL:
+        from . import bridge
+        if env("GOOGLE_AI_MODE") == "extension":
+            s["google_ai"] = (True, "Ihr Chrome über die Peilung-Erweiterung" + (
+                "" if bridge.connected() else " – derzeit nicht verbunden, Chrome öffnen"))
+        else:
+            s["google_ai"] = (True, f"Chrome mit Fernsteuerung unter {env('GOOGLE_CDP_URL', 'http://127.0.0.1:9222')}")
     prov = env("SEARCH_PROVIDER", "duckduckgo")
-    if prov == "brave":
+    if prov == "off":
+        pass
+    elif prov == "brave":
         s["web"] = (True, "Brave Search") if env("BRAVE_API_KEY") else (False, "BRAVE_API_KEY fehlt")
     else:
         s["web"] = (True, "DuckDuckGo (ohne Schlüssel)")
     return s
+
+
+def claude_code_path():
+    """Pfad zur Claude-Code-Kommandozeile oder None."""
+    return shutil.which(env("CLAUDE_CODE_PATH", "claude") or "claude")
 
 
 def openrouter_analysis_model():
@@ -99,9 +119,12 @@ def analysis_provider():
     """Anbieter für die Auswertung oder None."""
     want = env("ANALYSIS_PROVIDER", "auto")
     keys = {"anthropic": "ANTHROPIC_API_KEY", "openai": "OPENAI_API_KEY",
-            "gemini": "GEMINI_API_KEY", "perplexity": "PERPLEXITY_API_KEY", "openrouter": "OPENROUTER_API_KEY"}
+            "gemini": "GEMINI_API_KEY", "perplexity": "PERPLEXITY_API_KEY", "openrouter": "OPENROUTER_API_KEY",
+            "claudecode": None}
 
     def usable(p):
+        if p == "claudecode":
+            return env("CLAUDE_CODE_MODE", "off") == "on" and bool(claude_code_path())
         return bool(env(keys[p])) and (p != "openrouter" or bool(openrouter_analysis_model()))
 
     if want in keys:

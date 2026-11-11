@@ -115,7 +115,11 @@ def candidates(rep):
                     "copilot": "Copilot stützt sich auf Bing: Website in den Bing Webmaster Tools anmelden und Sitemap einreichen.",
                     "chatgpt": "ChatGPT sucht über eigene Crawler und Bing: Zugang für OAI-SearchBot erlauben, Bing-Indexierung prüfen.",
                     "perplexity": "Perplexity zitiert gern Verzeichnisse und Fachportale: dort mit aktuellem Profil vertreten sein.",
-                    "claude": "Claude zitiert häufig Seiten Dritter: Händler, Partner und Verzeichnisse mit korrekten Angaben versorgen."}[weak["key"]]
+                    "claude": "Claude zitiert häufig Seiten Dritter: Händler, Partner und Verzeichnisse mit korrekten Angaben versorgen.",
+                    "google_ai": "Die KI-Übersicht stützt sich auf den Google-Index: Indexierung prüfen, Unternehmensprofil bei Google pflegen und Fragen der Kunden auf eigenen Seiten klar beantworten.",
+                    "claudecode": "Claude zitiert häufig Seiten Dritter: Händler, Partner und Verzeichnisse mit korrekten Angaben versorgen."
+                    }.get(weak["key"], "Die Quellen in den Antworten dieses Modells ansehen und dort mit einheitlichen Angaben "
+                                       "(Name, Sitz, Leistungen, Link) vertreten sein; Zugang für KI-Crawler erlauben.")
             add("model:" + weak["key"], 2, 2, f"Schwächstes Modell gezielt angehen: {weak['label']}", "Suchindex und externe Quellen",
                 f"{weak['label']} nennt {name} in {weak['hits_nb']} von {weak['total_nb']} Fachantworten.", hint)
     wh, wt = rep["head"]["web"]

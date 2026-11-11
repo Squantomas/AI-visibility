@@ -74,6 +74,9 @@ def test_model_added_then_removed(monkeypatch):
     n = R1["head"]["questions"]
     assert R1["head"]["ai"][1] == n * 6 and [m["key"] for m in R1["models"]][-2:] == [KEY, "web"]
     assert all(m["measured"] for m in R1["models"])
+    from app import recommend
+    rep = {**R1, "ai_models": [{**m, "hits_nb": 0 if m["key"] == KEY else m["total_nb"]} for m in R1["ai_models"]]}
+    assert any(r["key"] == "model:" + KEY for r in recommend.candidates(rep))  # neuer Kanal als schwächstes Modell
 
     # Modell entfernen: neuer Lauf ohne das Modell, alter Bericht unverändert
     base = [c for c in chans if c["key"] != KEY]
@@ -87,3 +90,80 @@ def test_model_added_then_removed(monkeypatch):
     assert MODEL in [c["label"] for c in R2["trends"]["channels"]]  # Verlauf zeigt das Modell bis zum Entfernen
     R1b = report.build(r1)
     assert R1b["head"] == R1["head"] and MODEL in [m["label"] for m in R1b["models"]]
+
+
+def test_claude_code_subscription(monkeypatch):
+    """Claude über das Abo: Aufruf abgeschottet, ohne API-Schlüssel, Quellen aus den Suchtreffern."""
+    import json
+    import subprocess
+
+    seen = {}
+    lines = [{"type": "system", "subtype": "init"},
+             {"type": "user", "tool_use_result": {"query": "q", "results": [
+                 {"content": [{"title": "A", "url": "https://a.example/"}, {"title": "B", "url": "https://b.example/"}]}]}},
+             {"type": "result", "subtype": "success", "is_error": False, "result": "Anbieter A und B."}]
+
+    def fake_run(cmd, cwd, env, **kw):
+        seen.update(cmd=cmd, env=env)
+        return subprocess.CompletedProcess(cmd, 0, "\n".join(json.dumps(x) for x in lines), "")
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-ant-geheim")
+    monkeypatch.setattr(llm, "claude_code_path", lambda: "/bin/claude")
+    monkeypatch.setattr(llm.subprocess, "run", fake_run)
+    assert llm.claude_code("Wer liefert Filter?", web=True) == ("Anbieter A und B.", ["https://a.example/", "https://b.example/"])
+    assert "ANTHROPIC_API_KEY" not in seen["env"]
+    c = seen["cmd"]
+    assert c[c.index("--tools") + 1] == "WebSearch,WebFetch" and c[c.index("--setting-sources") + 1] == ""
+    llm.claude_code("Auswertung", system="JSON")
+    assert seen["cmd"][seen["cmd"].index("--tools") + 1] == ""
+    lines[-1] = {"type": "result", "subtype": "success", "is_error": True, "result": "Not logged in · Please run /login"}
+    try:
+        llm.claude_code("x", web=True)
+        raise AssertionError("Fehler erwartet")
+    except RuntimeError as e:
+        assert "401" in str(e)  # gilt als dauerhafter Fehler, keine Wiederholung
+
+
+def test_channel_order_without_web_search():
+    """Mit SEARCH_PROVIDER=off gibt es keinen Kanal "web"; unbekannte Kanäle stehen dann am Ende."""
+    import json
+    from app import config as cfg
+
+    base = [c for c in cfg.CHANNELS if c["key"] != "web"]
+    run = {"channels": json.dumps({"chatgpt": {"label": "ChatGPT"}, "google_ai": {"label": "Google KI-Übersicht"}})}
+    orig = cfg.CHANNELS
+    try:
+        cfg.CHANNELS = base
+        chans = report.channel_list([run])
+    finally:
+        cfg.CHANNELS = orig
+    assert [c["key"] for c in chans] == ["chatgpt", "google_ai"] and all(c["kind"] == "ai" for c in chans)
+
+
+def test_extension_bridge(monkeypatch):
+    """Auftrag geht an die Erweiterung, Ergebnis kommt als Antwort zurück; fremde Herkunft wird abgewiesen."""
+    import threading
+    from fastapi.testclient import TestClient
+    from app import bridge, channels
+    from app.main import app
+
+    monkeypatch.setenv("GOOGLE_AI_MODE", "extension")
+    monkeypatch.setattr(channels.time, "sleep", lambda s: None)
+    client = TestClient(app, client=("127.0.0.1", 50000))
+    ext = {"X-Peilung-Bridge": "1"}
+    assert client.get("/api/bridge/next").status_code == 403
+    assert client.get("/api/bridge/next", headers={**ext, "Origin": "https://boese.example"}).status_code == 403
+
+    def extension():
+        job = client.get("/api/bridge/next", headers=ext).json()
+        assert "google.com/search" in job["url"]
+        client.post("/api/bridge/result", headers=ext, json={
+            "id": job["id"], "ok": True, "found": True, "links": ["https://a.example/", "https://www.google.com/x"],
+            "text": "Übersicht mit KI\nAnbieter A und B.\nKI-Antworten können Fehler enthalten. Weitere Informationen"})
+
+    bridge._last_seen[0] = __import__("time").time()
+    t = threading.Thread(target=extension)
+    t.start()
+    r = channels._google_ai("Wer liefert Filter?", "de")
+    t.join()
+    assert r["text"] == "Anbieter A und B." and r["citations"] == ["https://a.example/"]

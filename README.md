@@ -94,8 +94,10 @@ Jeder fehlende Kanal erscheint im Bericht als „nicht gemessen“; die übrigen
 | Gemini | `GEMINI_API_KEY` | aistudio.google.com |
 | Perplexity | `PERPLEXITY_API_KEY` | perplexity.ai, Einstellungen → API |
 | Claude | `ANTHROPIC_API_KEY` | console.anthropic.com |
+| Claude über Ihr Claude-Abo | `CLAUDE_CODE_MODE=on` | kein Schlüssel, siehe „Claude über das Claude-Abo“ |
+| Google KI-Übersicht | `GOOGLE_AI_MODE=on` | kein Schlüssel, Ihr eigener Chrome, siehe „Google KI-Übersicht“ |
 | Weitere Modelle über OpenRouter | `OPENROUTER_API_KEY` und `OPENROUTER_MODELS` | openrouter.ai, siehe nächster Abschnitt |
-| Websuche | `SEARCH_PROVIDER=brave` und `BRAVE_API_KEY` | brave.com/search/api (empfohlen); ohne Schlüssel `SEARCH_PROVIDER=duckduckgo` |
+| Websuche | `SEARCH_PROVIDER=brave` und `BRAVE_API_KEY` | brave.com/search/api (empfohlen); ohne Schlüssel `SEARCH_PROVIDER=duckduckgo`; ausschalten mit `SEARCH_PROVIDER=off` |
 | Copilot | `COPILOT_MODE=browser` | kein Schlüssel, siehe Hinweis unten |
 
 Danach Peilung neu starten und unter **„Kanäle & Einstellungen“** je Kanal die **Testabfrage** ausführen.
@@ -194,6 +196,77 @@ Ergebnissen erhalten. Die Gesamt-Trefferquote rechnet über alle in der jeweilig
 Wenn Sie Modelle hinzufügen oder entfernen, verschiebt sich also die Grundlage des Vergleichs zur
 Vorprüfung. Die Werte je Modell bleiben vergleichbar.
 
+### Claude über das Claude-Abo (Claude Code)
+
+Haben Sie ein Claude-Abo (Pro oder Max) und Claude Code installiert, kann Peilung Claude darüber befragen.
+Ein API-Schlüssel ist dafür nicht nötig. Der Kanal heißt im Bericht **„Claude (Abo)“** und läuft
+zusätzlich zum Kanal „Claude“ über die API.
+
+1. Claude Code installieren (claude.com/claude-code). Einmal `claude` im Terminal starten und mit dem
+   Abo anmelden.
+2. In `.env` setzen:
+   ```
+   CLAUDE_CODE_MODE=on
+   CLAUDE_CODE_MODEL=        # optional, z. B. opus oder sonnet; leer = Standard Ihres Kontos
+   CLAUDE_CODE_PATH=claude   # nur ändern, wenn claude nicht im Suchpfad liegt
+   ```
+3. Peilung neu starten und unter „Kanäle & Einstellungen“ die Testabfrage ausführen.
+
+So funktioniert es: Peilung startet je Frage `claude -p` im nicht-interaktiven Modus. Claude Code läuft dabei
+abgeschottet: leeres Arbeitsverzeichnis, ohne Ihre Einstellungen, Plugins, Hooks und MCP-Server, und als
+Werkzeug nur die Websuche. Ein gesetzter `ANTHROPIC_API_KEY` wird für diesen Aufruf ausgeblendet, damit
+über das Abo abgerechnet wird und nicht über die API. Als Quellen gelten die Treffer der Websuche, die
+Claude gelesen hat.
+
+Zu beachten:
+- Die Abfragen zählen gegen die **Nutzungsgrenzen Ihres Abos**. Eine Prüfung mit 22 Fragen sind 22
+  Anfragen mit Websuche, höchstens zwei gleichzeitig. Ist das Kontingent erschöpft, schlagen die
+  Abfragen fehl. Sie lassen sich auf der Seite des Laufs später erneut anstoßen.
+- Das Abo ist für Ihren eigenen Gebrauch. Für ein Angebot an Kunden den Kanal „Claude“ mit API-Schlüssel
+  verwenden.
+- Mit `ANALYSIS_PROVIDER=claudecode` übernimmt das Abo auch die Auswertung. Bei `auto` geschieht das nur,
+  wenn kein anderer KI-Schlüssel eingetragen ist.
+
+### Google KI-Übersicht (Ihr eigener Chrome)
+
+Der Kanal **„Google KI-Übersicht“** stellt jede Frage bei Google und liest die „Übersicht mit KI“ aus, die
+Google über den Treffern zeigt. Er misst damit die KI-Antwort, die die meisten Menschen tatsächlich sehen.
+Die Quellen sind die Links in der Übersicht. Zeigt Google keine Übersicht, gilt die Antwort als „nicht
+genannt“.
+
+**Empfohlen: über die Peilung-Erweiterung in Ihrem normalen Chrome.** Die Suchen laufen dann in dem Chrome,
+mit dem Sie selbst googeln, mit Ihren Cookies und Ihrer Anmeldung. Ein frisches, unbekanntes Browserprofil
+sperrt Google dagegen schnell mit einem Captcha.
+
+1. In Chrome `chrome://extensions` öffnen und oben rechts den **Entwicklermodus** einschalten.
+2. **„Entpackte Erweiterung laden“** klicken und den Ordner `chrome_extension` im Projektordner wählen.
+3. In `.env` setzen: `GOOGLE_AI_MODE=extension`
+4. Peilung neu starten. Unter „Kanäle & Einstellungen“ steht bei „Google KI-Übersicht“, ob die Erweiterung
+   verbunden ist (das kann nach dem Start bis zu 30 Sekunden dauern). Dann die Testabfrage ausführen.
+
+Die Erweiterung fragt Peilung unter `http://127.0.0.1:8000` nach Suchaufträgen. Läuft Peilung auf einem
+anderen Port, die Adresse oben in `chrome_extension/background.js` anpassen und die Erweiterung neu laden.
+Peilung nimmt die Ergebnisse nur vom eigenen Rechner und nur von einer Chrome-Erweiterung an, auch wenn ein
+`APP_PASSWORD` gesetzt ist.
+
+**Alternative ohne Erweiterung** (`GOOGLE_AI_MODE=on`): Peilung steuert ein zweites Chrome mit eigenem Profil
+über das DevTools-Protokoll. Starten mit
+
+```bash
+open -na "Google Chrome" --args --remote-debugging-port=9222 --user-data-dir="$HOME/.peilung-chrome" --no-first-run
+```
+
+Unter Linux: `google-chrome --remote-debugging-port=9222 --user-data-dir="$HOME/.peilung-chrome" &`.
+In diesem Fenster einmal bei Google anmelden und ein Captcha lösen, sonst sperrt Google sofort.
+
+Während einer Messung muss Chrome offen bleiben. Peilung öffnet je Frage kurz einen Hintergrund-Tab, liest
+die Übersicht und schließt ihn wieder. Zwischen zwei Suchen liegen 2–4 Sekunden. Zeigt Google eine
+Sperrseite (Captcha), wird die Abfrage sofort als Fehler markiert und nicht wiederholt. Lösen Sie dann das
+Captcha im Fenster und stoßen Sie die Fragen auf der Seite des Laufs erneut an.
+
+Hinweis: Automatisches Abfragen widerspricht den Nutzungsbedingungen von Google. Bei 20–25 Suchen pro
+Prüfung im Tempo eines Menschen ist das Risiko einer Sperre gering, aber nicht ausgeschlossen.
+
 ### Optional: PDF-Export und Copilot
 
 ```bash
@@ -247,7 +320,7 @@ pip install pytest && python -m pytest -q tests
 | `app/main.py`, `app/templates/` | Weboberfläche und Berichtsvorlage (FastAPI, Jinja2) |
 | `app/crawl.py` | Seiten finden und lesen, technische Prüfpunkte |
 | `app/questions.py` | Fragen und Themenfelder ableiten und pflegen, Änderungsprotokoll |
-| `app/channels.py`, `app/llm.py` | Die Messkanäle (inkl. OpenRouter), Auswertungsmodell, Demo-Antworten |
+| `app/channels.py`, `app/llm.py` | Die Messkanäle (inkl. OpenRouter, Claude-Abo, Google KI-Übersicht), Auswertungsmodell, Demo-Antworten |
 | `openrouter_config.py` | OpenRouter-Modelle auswählen und entfernen, Kosten einer Prüfung schätzen |
 | `app/measure.py` | Messlauf, Anbietererkennung, Zeitplanung und Warteschlange |
 | `app/recommend.py` | Regeln für Empfehlungen, optionale Textvorschläge |

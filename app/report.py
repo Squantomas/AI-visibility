@@ -26,7 +26,8 @@ def channel_list(runs):
     if not labels:
         return list(config.CHANNELS)
     order = [c["key"] for c in config.CHANNELS]
-    rank = lambda k: order.index(k) if k in order else order.index("web") - 0.5  # noqa: E731
+    end = order.index("web") if "web" in order else len(order)
+    rank = lambda k: order.index(k) if k in order else end - 0.5  # noqa: E731
     return [{"key": k, "label": labels[k], "kind": "ai" if is_ai(k) else "web"} for k in sorted(labels, key=rank)]
 
 
