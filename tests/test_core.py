@@ -6,6 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["DEMO_MODE"] = "1"
+os.environ["OPENROUTER_MODELS"] = ""  # Kanalzahl unabhängig von der eigenen .env
+os.environ["CLAUDE_CODE_MODE"] = "off"
+os.environ["GOOGLE_AI_MODE"] = "off"
+os.environ["SEARCH_PROVIDER"] = "duckduckgo"
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "test.db")
 os.environ["NO_PROXY"] = os.environ.get("NO_PROXY", "") + ",localhost,127.0.0.1"
 
@@ -29,6 +33,12 @@ def test_brand_is_found_in_all_spellings():
 def test_robots_blocking():
     assert crawl.blocked_bots("User-agent: GPTBot\nDisallow: /\n") == ["GPTBot"]
     assert crawl.blocked_bots("User-agent: *\nDisallow: /privat\n") == []
+
+
+def test_images_in_removed_areas():
+    page = crawl.parse_page("https://x.example/", "<html><header><img src=a.png></header>"
+                            "<main><img src=b.png alt='B'></main><footer><img src=c.png alt=''></footer></html>")
+    assert page["imgs"] == 3 and page["imgs_no_alt"] == 2
 
 
 def test_next_run():
@@ -100,3 +110,21 @@ def test_full_cycle():
     db.x("UPDATE sites SET next_run_at='2000-01-01T00:00:00+00:00' WHERE id=?", (sid,))
     assert measure.scheduler_tick() is True
     assert db.one("SELECT COUNT(*) AS n FROM runs WHERE site_id=? AND status='done'", (sid,))["n"] == 3
+
+
+def test_delete_site():
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    sid = questions.create_site(f"http://localhost:{PORT}", "Löschtest GmbH", "none")
+    questions.analyse_site(sid)
+    rid = measure.enqueue(sid)
+    client = TestClient(app)
+    db.x("UPDATE runs SET status='running' WHERE id=?", (rid,))
+    assert client.post(f"/sites/{sid}/delete", follow_redirects=False).status_code == 409
+    measure.execute(rid)
+    assert client.post(f"/sites/{sid}/delete", follow_redirects=False).status_code == 303
+    assert db.one("SELECT 1 AS x FROM sites WHERE id=?", (sid,)) is None
+    for t, col, val in [("runs", "site_id", sid), ("questions", "site_id", sid), ("topics", "site_id", sid),
+                        ("vendors", "site_id", sid), ("answers", "run_id", rid), ("run_questions", "run_id", rid)]:
+        assert db.one(f"SELECT COUNT(*) AS n FROM {t} WHERE {col}=?", (val,))["n"] == 0, t

@@ -23,5 +23,9 @@
 <label class="grow">Schreibweisen der Marke (durch Komma getrennt)<br><input type="text" name="aliases" value="{{ s.aliases_list|join(', ') }}"></label>
 <button style="align-self:flex-end">Speichern</button></div>
 <p class="small muted" style="margin:8px 0 0">Eine Antwort zählt als Treffer, wenn sie eine dieser Schreibweisen oder die Domain nennt. Umlaute werden in allen Varianten erkannt (ö, oe, o). Änderungen gelten rückwirkend für alle Prüfungen.</p></form></div>
-<form method="post" action="/sites/{{ s.id }}/delete" data-confirm="Website mit allen Fragen, Prüfungen und Berichten endgültig löschen?"><button class="link danger">Website löschen</button></form>
+<div class="card"><h3>Website löschen</h3>
+{% set busy = s.state == 'analysing' or runs|selectattr('status', 'equalto', 'running')|list %}
+<p class="small muted" style="margin:0 0 8px">Entfernt „{{ s.name }}“ mit allen Fragen, Themenfeldern, Prüfungen, Berichten und der Anbieterliste. Das lässt sich nicht rückgängig machen.</p>
+{% if busy %}<p class="small" style="margin:0">Während die Website eingelesen oder gemessen wird, ist Löschen nicht möglich.</p>
+{% else %}<form method="post" action="/sites/{{ s.id }}/delete" data-confirm="„{{ s.name }}“ mit allen Fragen, Prüfungen und Berichten endgültig löschen?"><button class="danger">Website löschen</button></form>{% endif %}</div>
 {% endblock %}{% block script %}{% if s.state=='analysing' %}<script>poll('/api/sites/{{ s.id }}', function (d) { if (d.state !== 'analysing') { location.reload(); return true; } });</script>{% endif %}{% endblock %}

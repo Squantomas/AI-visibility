@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 
-from . import __version__, channels, config, db, measure, questions, report
+from . import __version__, bridge, channels, config, db, measure, questions, report
 from .config import env
 
 BASE = Path(__file__).parent
@@ -32,7 +32,7 @@ def startup():
 @app.middleware("http")
 async def password(request: Request, call_next):
     pw = env("APP_PASSWORD")
-    if pw:
+    if pw and not _bridge_request(request):
         try:
             given = base64.b64decode(request.headers.get("authorization", "").split(" ", 1)[1]).decode().split(":", 1)[1]
         except Exception:
@@ -40,6 +40,35 @@ async def password(request: Request, call_next):
         if not secrets.compare_digest(given.encode(), pw.encode()):
             return Response("Anmeldung nötig", 401, {"WWW-Authenticate": 'Basic realm="Peilung"'})
     return await call_next(request)
+
+
+def _bridge_request(request):
+    """Anfrage der Peilung-Erweiterung: nur vom eigenen Rechner und mit dem Kopf X-Peilung-Bridge.
+
+    Eine Webseite kann diesen Kopf nur nach einer CORS-Vorabfrage senden, die Peilung nie genehmigt; so kann
+    keine Seite Aufträge abholen oder Ergebnisse einschleusen. Ein mitgeschickter Origin muss eine Erweiterung sein.
+    """
+    origin = request.headers.get("origin", "")
+    return (request.url.path.startswith("/api/bridge/") and request.client is not None
+            and request.client.host in ("127.0.0.1", "::1") and request.headers.get("x-peilung-bridge") == "1"
+            and (not origin or origin.startswith("chrome-extension://")))
+
+
+@app.get("/api/bridge/next")
+def bridge_next(request: Request):
+    if not _bridge_request(request):
+        raise HTTPException(403)
+    job = bridge.next_job()
+    return job if job else Response(status_code=204)
+
+
+@app.post("/api/bridge/result")
+async def bridge_result(request: Request):
+    if not _bridge_request(request):
+        raise HTTPException(403)
+    data = await request.json()
+    bridge.deliver(int(data.get("id", 0)), data)
+    return {"ok": True}
 
 
 # ---------- Darstellungshelfer ----------
@@ -198,7 +227,10 @@ def site_reanalyse(sid: int):
 
 @app.post("/sites/{sid}/delete")
 def site_delete(sid: int):
-    get_site(sid)
+    s = get_site(sid)
+    # Ein laufender Hintergrundprozess würde sonst in die gelöschte Website weiterschreiben.
+    if s["state"] == "analysing" or db.one("SELECT 1 AS x FROM runs WHERE site_id=? AND status='running'", (sid,)):
+        raise HTTPException(409, "Die Website wird gerade eingelesen oder gemessen. Bitte danach löschen.")
     for r in db.q("SELECT id FROM runs WHERE site_id=?", (sid,)):
         db.x("DELETE FROM answer_vendors WHERE answer_id IN (SELECT id FROM answers WHERE run_id=?)", (r["id"],))
         for t in ("answers", "run_questions", "recommendations"):
@@ -403,8 +435,9 @@ def answer_page(request: Request, aid: int):
     vmap = report.vendor_map(r["site_id"])
     vs = [vmap[x["vendor_id"]]["name"] for x in db.q("SELECT * FROM answer_vendors WHERE answer_id=? ORDER BY pos", (aid,))
           if x["vendor_id"] in vmap]
+    label = {c["key"]: c["label"] for c in report.channel_list([r])}.get(a["channel"], a["channel"])
     return tpl.TemplateResponse(request, "answer.html", {
-        "a": a, "r": r, "q": qu, "s": get_site(r["site_id"]), "cites": db.jload(a["citations"], []), "vendors": vs})
+        "a": a, "r": r, "label": label, "q": qu, "s": get_site(r["site_id"]), "cites": db.jload(a["citations"], []), "vendors": vs})
 
 
 # ---------- Einstellungen ----------

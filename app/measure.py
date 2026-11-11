@@ -95,7 +95,8 @@ def execute(run_id):
 
         status = config.channel_status()
         db.x("UPDATE runs SET channels=? WHERE id=?",
-             (json.dumps({k: {"ready": v[0], "note": v[1]} for k, v in status.items()}, ensure_ascii=False), run_id))
+             (json.dumps({k: {"ready": v[0], "note": v[1], "label": config.CHANNEL_LABEL[k]}
+                         for k, v in status.items()}, ensure_ascii=False), run_id))
         _ask_all(run_id, site, qs, status)
 
         if not db.one("SELECT 1 AS x FROM answers WHERE run_id=? AND status='ok'", (run_id,)):
@@ -167,7 +168,7 @@ def _ask_all(run_id, site, qs, status):
             for qu, _ in todo:
                 store(qu, channel, "skipped", error=status[channel][1])
             return
-        workers = 1 if channel in ("copilot", "web") else 3
+        workers = 1 if channel in ("copilot", "google_ai", "web") else (2 if channel == "claudecode" else 3)
         with ThreadPoolExecutor(max_workers=workers) as pool:
             list(pool.map(one, todo))
 

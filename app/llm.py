@@ -1,11 +1,14 @@
 """Zugriff auf die Sprachmodelle: einmal als Messkanal (mit Websuche), einmal für die Auswertung (JSON)."""
 import json
+import os
 import re
+import subprocess
+import tempfile
 import time
 
 import httpx
 
-from .config import env
+from .config import claude_code_path, env, openrouter_analysis_model
 
 TIMEOUT = 180
 
@@ -23,7 +26,7 @@ def retry(fn, attempts=3):
         except Exception as e:
             last = e
             msg = str(e)
-            permanent = any(code in msg for code in (" 400", " 401", " 403", " 404")) or isinstance(e, NotConfigured)
+            permanent = any(code in msg for code in (" 400", " 401", " 403", " 404")) or isinstance(e, (NotConfigured, Blocked))
             if permanent or i == attempts - 1:
                 break
             time.sleep(float(env("RETRY_PAUSE", "3")) * 3 ** i)
@@ -32,6 +35,10 @@ def retry(fn, attempts=3):
 
 class NotConfigured(Exception):
     pass
+
+
+class Blocked(Exception):
+    """Der Dienst hat gesperrt (z. B. Captcha). Nicht wiederholen."""
 
 
 def _post(url, headers, body):
@@ -149,7 +156,95 @@ def perplexity(prompt, system=None, web=True):
     return text.strip(), list(dict.fromkeys(cites))
 
 
-PROVIDERS = {"anthropic": claude, "openai": openai, "gemini": gemini, "perplexity": perplexity}
+# ---------- Claude Code: Claude über das eigene Abo (Pro/Max) ----------
+
+CLAUDE_CODE_SYSTEM = ("Du bist Claude, ein KI-Assistent von Anthropic. Recherchiere bei Fragen nach Anbietern, "
+                      "Produkten oder Unternehmen mit der Websuche, bevor du antwortest, und nenne konkrete Anbieter.")
+
+
+def claude_code(prompt, system=None, web=False):
+    """Fragt Claude über die Kommandozeile von Claude Code im nicht-interaktiven Modus.
+
+    Abgerechnet wird über das Abo des angemeldeten Kontos. Claude Code läuft dabei abgeschottet: leeres
+    Arbeitsverzeichnis, keine Einstellungen, Plugins, Hooks oder MCP-Server, als Werkzeuge nur die Websuche.
+    """
+    exe = claude_code_path()
+    if not exe:
+        raise NotConfigured("Programm claude nicht gefunden")
+    cmd = [exe, "-p", prompt, "--output-format", "stream-json", "--verbose", "--setting-sources", "",
+           "--strict-mcp-config", "--disable-slash-commands", "--no-session-persistence",
+           "--system-prompt", system or CLAUDE_CODE_SYSTEM]
+    cmd += (["--tools", "WebSearch,WebFetch", "--allowedTools", "WebSearch", "WebFetch", "--permission-mode", "dontAsk"]
+            if web else ["--tools", ""])
+    if env("CLAUDE_CODE_MODEL"):
+        cmd += ["--model", env("CLAUDE_CODE_MODEL")]
+    # Ohne API-Schlüssel in der Umgebung meldet sich Claude Code mit dem Abo an statt kostenpflichtig per API.
+    run_env = {k: v for k, v in os.environ.items() if k not in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")}
+    with tempfile.TemporaryDirectory() as cwd:
+        try:
+            proc = subprocess.run(cmd, cwd=cwd, env=run_env, capture_output=True, text=True, timeout=TIMEOUT * 2)
+        except subprocess.TimeoutExpired:
+            raise RuntimeError("Claude Code hat nicht rechtzeitig geantwortet")
+    result, cites = None, []
+    for line in proc.stdout.splitlines():
+        try:
+            d = json.loads(line)
+        except ValueError:
+            continue
+        tr = d.get("tool_use_result") if d.get("type") == "user" else None
+        if isinstance(tr, dict):  # Treffer der Websuche: Quellen, die Claude gelesen hat
+            for block in tr.get("results") or []:
+                for c in (block.get("content") if isinstance(block, dict) else None) or []:
+                    if isinstance(c, dict) and c.get("url"):
+                        cites.append(c["url"])
+        if d.get("type") == "result":
+            result = d
+    if not result:
+        raise RuntimeError(f"Claude Code ohne Ergebnis (Exit {proc.returncode}): {(proc.stderr or proc.stdout)[-300:]}")
+    text = result.get("result") or ""
+    if result.get("is_error") or result.get("subtype") != "success":
+        low = text.lower()
+        if "login" in low or "authenticat" in low:
+            raise RuntimeError(f"HTTP 401 Claude Code nicht angemeldet: {text[:200]}")
+        raise RuntimeError(f"Claude Code: {text[:300] or result.get('subtype')}")
+    return text.strip(), list(dict.fromkeys(cites))
+
+
+# ---------- OpenRouter: viele Modelle über eine Schnittstelle ----------
+
+def openrouter(prompt, system=None, web=False, model=None):
+    if not env("OPENROUTER_API_KEY"):
+        raise NotConfigured("OPENROUTER_API_KEY fehlt")
+    model = model or openrouter_analysis_model()
+    if not model:
+        raise NotConfigured("Kein OpenRouter-Modell gewählt")
+    msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+    body = {"model": model, "messages": msgs}
+    if web:
+        # Websuche als Server-Tool: das Modell entscheidet selbst, ob und wie oft es sucht.
+        # "auto" nutzt die eingebaute Suche des Herstellers, wo es sie gibt, sonst Exa.
+        body["tools"] = [{"type": "openrouter:web_search", "parameters": {
+            "engine": env("OPENROUTER_SEARCH_ENGINE", "auto"), "max_results": 5, "max_uses": 3,
+            "max_total_results": 15,
+            "user_location": {"type": "approximate", "country": env("SEARCH_COUNTRY", "de").upper()}}}]
+    data = _post("https://openrouter.ai/api/v1/chat/completions",
+                 {"Authorization": "Bearer " + env("OPENROUTER_API_KEY"), "X-Title": "Peilung"}, body)
+    if data.get("error"):
+        raise RuntimeError(f"OpenRouter: {data['error']}"[:400])
+    msg = (data.get("choices") or [{}])[0].get("message") or {}
+    content = msg.get("content") or ""
+    if isinstance(content, list):  # manche Modelle liefern die Antwort in Teilen
+        content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
+    cites = []
+    for a in msg.get("annotations") or []:
+        url = (a.get("url_citation") or {}).get("url") or a.get("url")
+        if url:
+            cites.append(url)
+    return content.strip(), list(dict.fromkeys(cites))
+
+
+PROVIDERS = {"anthropic": claude, "openai": openai, "gemini": gemini, "perplexity": perplexity,
+             "openrouter": openrouter, "claudecode": claude_code}
 
 
 # ---------- Auswertung: Antwort als JSON ----------

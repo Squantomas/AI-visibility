@@ -1,6 +1,6 @@
 {% extends "base.html" %}{% block main %}
 <p class="small"><a href="/runs/{{ r.id }}/report">← Bericht vom {{ r.started_at|date }}</a></p>
-<h1>{{ channel_label[a.channel] }} · Frage {{ q.code }}</h1><p class="sub">{{ q.text }}</p>
+<h1>{{ label }} · Frage {{ q.code }}</h1><p class="sub">{{ q.text }}</p>
 <p>{% if a.status!='ok' %}<span class="pill bad">{{ 'nicht gemessen' if a.status=='skipped' else 'Abfrage fehlgeschlagen' }}</span> {{ a.error }}
 {% elif a.mentioned %}<span class="pill ok">{{ s.name }} {{ 'unter den ersten zehn, Platz %d'|format(a.rank) if a.channel=='web' else 'wird genannt' }}</span>
 {% else %}<span class="pill">{{ s.name }} {{ 'nicht unter den ersten zehn' if a.channel=='web' else 'wird nicht genannt' }}</span>{% endif %}

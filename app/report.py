@@ -8,7 +8,27 @@ from collections import Counter, defaultdict
 from . import config, db
 from .textutil import domain_of, same_site
 
-AI = config.AI_CHANNELS
+def is_ai(channel):
+    """Alle Kanäle außer der Websuche sind KI-Kanäle, auch inzwischen entfernte OpenRouter-Modelle."""
+    return channel != "web"
+
+
+def channel_list(runs):
+    """Kanäle der Läufe in Berichtsreihenfolge, so wie sie beim Lauf eingestellt waren.
+
+    Ein später entferntes OpenRouter-Modell bleibt dadurch in alten Berichten und Verläufen erhalten;
+    ein neu gewähltes erscheint erst ab dem Lauf, in dem es gemessen wurde.
+    """
+    labels = {}
+    for r in runs:
+        for k, v in (db.jload(r["channels"], {}) or {}).items():
+            labels.setdefault(k, (v or {}).get("label") or config.CHANNEL_LABEL.get(k, k))
+    if not labels:
+        return list(config.CHANNELS)
+    order = [c["key"] for c in config.CHANNELS]
+    end = order.index("web") if "web" in order else len(order)
+    rank = lambda k: order.index(k) if k in order else end - 0.5  # noqa: E731
+    return [{"key": k, "label": labels[k], "kind": "ai" if is_ai(k) else "web"} for k in sorted(labels, key=rank)]
 
 
 def pct(h, t):
@@ -52,12 +72,12 @@ def run_stats(run, tmap, vmap):
     by_q = defaultdict(dict)
     for a in answers:
         by_q[a["question_id"]][a["channel"]] = a
-    measured = {ch: any(a["channel"] == ch and a["status"] == "ok" for a in answers) for ch in [c["key"] for c in config.CHANNELS]}
+    measured = {a["channel"] for a in answers if a["status"] == "ok"}
     qs = []
     for r in rq:
         t = tmap.get(r["topic_id"])
         cells = by_q.get(r["question_id"], {})
-        ok_ai = [cells[ch] for ch in AI if ch in cells and cells[ch]["status"] == "ok"]
+        ok_ai = [a for ch, a in cells.items() if is_ai(ch) and a["status"] == "ok"]
         web = cells.get("web")
         qs.append({**r, "tid": t["id"] if t else r["topic_id"], "topic": t["name"] if t else r["topic_name"],
                    "cells": cells, "ai_hits": sum(a["mentioned"] for a in ok_ai), "ai_total": len(ok_ai),
@@ -72,9 +92,8 @@ def agg(qs, channel=None):
     """(Treffer, Antworten) über die KI-Kanäle bzw. einen Kanal."""
     h = t = 0
     for qu in qs:
-        for ch in ([channel] if channel else AI):
-            a = qu["cells"].get(ch)
-            if a and a["status"] == "ok":
+        for ch, a in qu["cells"].items():
+            if (ch == channel if channel else is_ai(ch)) and a["status"] == "ok":
                 t += 1
                 h += 1 if a["mentioned"] else 0
     return h, t
@@ -98,9 +117,8 @@ def vendor_shares(qs):
         if qu["is_brand"]:
             continue
         d = out.setdefault(qu["tid"], {"n": 0, "self": 0, "v": Counter(), "name": qu["topic"]})
-        for ch in AI:
-            a = qu["cells"].get(ch)
-            if a and a["status"] == "ok" and a["id"] in qu["vendors"]:
+        for ch, a in qu["cells"].items():
+            if is_ai(ch) and a["status"] == "ok" and a["id"] in qu["vendors"]:
                 d["n"] += 1
                 d["self"] += 1 if a["mentioned"] else 0
                 d["v"].update(qu["vendors"][a["id"]])
@@ -143,8 +161,9 @@ def build(run_id):
             "d_ai": d(), "d_nb": d(lambda qu: not qu["is_brand"]), "d_web": d(web=True),
             "comparable": len(comparable), "questions": len(qs)}
 
+    channels = channel_list([run])
     models = []
-    for c in config.CHANNELS:
+    for c in channels:
         k = c["key"]
         if c["kind"] == "ai":
             h, t = agg(qs, k)
@@ -157,13 +176,13 @@ def build(run_id):
                     cites += a["cited"]
                     top.update(qu["vendors"].get(a["id"], ()))
             models.append({**c, "hits": h, "total": t, "hits_nb": hn, "total_nb": tn, "rate": pct(h, t),
-                           "delta": d(channel=k), "measured": cur["measured"][k], "cites_own": cites,
+                           "delta": d(channel=k), "measured": k in cur["measured"], "cites_own": cites,
                            "errors": cur["errors"].get(k, 0),
                            "top": [vmap[v]["name"] for v, _ in top.most_common(3)]})
         else:
             h, t = web_agg(qs)
             models.append({**c, "hits": h, "total": t, "rate": pct(h, t), "delta": d(web=True),
-                           "measured": cur["measured"][k], "errors": cur["errors"].get(k, 0), "top": []})
+                           "measured": k in cur["measured"], "errors": cur["errors"].get(k, 0), "top": []})
 
     # --- Themenfelder
     changes = []
@@ -238,9 +257,8 @@ def build(run_id):
     # --- Quellen, auf die sich die Antworten stützen
     src, src_hit, n_src = Counter(), Counter(), 0
     for qu in nb:
-        for ch in AI:
-            a = qu["cells"].get(ch)
-            if a and a["status"] == "ok":
+        for ch, a in qu["cells"].items():
+            if is_ai(ch) and a["status"] == "ok":
                 doms = {domain_of(u) for u in db.jload(a["citations"], [])} - {""}
                 n_src += 1 if doms else 0
                 src.update(doms)
@@ -272,7 +290,7 @@ def build(run_id):
         "nb": series(lambda s: pct(*agg([qu for qu in s["questions"] if not qu["is_brand"]]))),
         "channels": [{"label": c["label"], "values": series(
             lambda s, k=c["key"], w=c["kind"] == "web": pct(*(web_agg(s["questions"]) if w else agg(s["questions"], k))))}
-            for c in config.CHANNELS],
+            for c in channel_list(history)],
         "topics": trend_topics,
     }
 
@@ -302,7 +320,7 @@ def build(run_id):
         "n_src": n_src, "checks": audit.get("checks", []), "pages": audit.get("pages", 0),
         "recs": db.q("SELECT * FROM recommendations WHERE run_id=? ORDER BY prio", (run_id,)),
         "findings": (db.jload(run["summary"], {}) or {}).get("findings", []),
-        "trends": trends, "changes": change_rows, "channels": config.CHANNELS,
+        "trends": trends, "changes": change_rows, "channels": channels,
         "unmeasured": [m["label"] for m in models if not m["measured"]],
         "errors": sum(cur["errors"].values()),
     }
