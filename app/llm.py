@@ -5,7 +5,7 @@ import time
 
 import httpx
 
-from .config import env
+from .config import env, openrouter_analysis_model
 
 TIMEOUT = 180
 
@@ -149,7 +149,41 @@ def perplexity(prompt, system=None, web=True):
     return text.strip(), list(dict.fromkeys(cites))
 
 
-PROVIDERS = {"anthropic": claude, "openai": openai, "gemini": gemini, "perplexity": perplexity}
+# ---------- OpenRouter: viele Modelle über eine Schnittstelle ----------
+
+def openrouter(prompt, system=None, web=False, model=None):
+    if not env("OPENROUTER_API_KEY"):
+        raise NotConfigured("OPENROUTER_API_KEY fehlt")
+    model = model or openrouter_analysis_model()
+    if not model:
+        raise NotConfigured("Kein OpenRouter-Modell gewählt")
+    msgs = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+    body = {"model": model, "messages": msgs}
+    if web:
+        # Websuche als Server-Tool: das Modell entscheidet selbst, ob und wie oft es sucht.
+        # "auto" nutzt die eingebaute Suche des Herstellers, wo es sie gibt, sonst Exa.
+        body["tools"] = [{"type": "openrouter:web_search", "parameters": {
+            "engine": env("OPENROUTER_SEARCH_ENGINE", "auto"), "max_results": 5, "max_uses": 3,
+            "max_total_results": 15,
+            "user_location": {"type": "approximate", "country": env("SEARCH_COUNTRY", "de").upper()}}}]
+    data = _post("https://openrouter.ai/api/v1/chat/completions",
+                 {"Authorization": "Bearer " + env("OPENROUTER_API_KEY"), "X-Title": "Peilung"}, body)
+    if data.get("error"):
+        raise RuntimeError(f"OpenRouter: {data['error']}"[:400])
+    msg = (data.get("choices") or [{}])[0].get("message") or {}
+    content = msg.get("content") or ""
+    if isinstance(content, list):  # manche Modelle liefern die Antwort in Teilen
+        content = "".join(p.get("text", "") for p in content if isinstance(p, dict))
+    cites = []
+    for a in msg.get("annotations") or []:
+        url = (a.get("url_citation") or {}).get("url") or a.get("url")
+        if url:
+            cites.append(url)
+    return content.strip(), list(dict.fromkeys(cites))
+
+
+PROVIDERS = {"anthropic": claude, "openai": openai, "gemini": gemini, "perplexity": perplexity,
+             "openrouter": openrouter}
 
 
 # ---------- Auswertung: Antwort als JSON ----------

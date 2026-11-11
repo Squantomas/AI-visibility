@@ -403,8 +403,9 @@ def answer_page(request: Request, aid: int):
     vmap = report.vendor_map(r["site_id"])
     vs = [vmap[x["vendor_id"]]["name"] for x in db.q("SELECT * FROM answer_vendors WHERE answer_id=? ORDER BY pos", (aid,))
           if x["vendor_id"] in vmap]
+    label = {c["key"]: c["label"] for c in report.channel_list([r])}.get(a["channel"], a["channel"])
     return tpl.TemplateResponse(request, "answer.html", {
-        "a": a, "r": r, "q": qu, "s": get_site(r["site_id"]), "cites": db.jload(a["citations"], []), "vendors": vs})
+        "a": a, "r": r, "label": label, "q": qu, "s": get_site(r["site_id"]), "cites": db.jload(a["citations"], []), "vendors": vs})
 
 
 # ---------- Einstellungen ----------

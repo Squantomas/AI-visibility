@@ -58,6 +58,8 @@ def parse_page(url, html):
     h1 = [h.get_text(" ", strip=True) for h in soup.find_all("h1")]
     h2 = [h.get_text(" ", strip=True) for h in soup.find_all("h2")][:12]
     imgs = soup.find_all("img")
+    # vor decompose() zählen: entfernte Tags verlieren ihre Attribute
+    imgs_no_alt = sum(1 for i in imgs if not (i.get("alt") or "").strip())
     ld_types = []
     for s in soup.find_all("script", type="application/ld+json"):
         try:
@@ -89,7 +91,7 @@ def parse_page(url, html):
         "url": url, "title": title, "description": (desc.get("content", "").strip() if desc else ""),
         "noindex": bool(robots and "noindex" in robots.get("content", "").lower()),
         "h1": h1, "h2": h2, "words": len(text.split()), "text": text,
-        "imgs": len(imgs), "imgs_no_alt": sum(1 for i in imgs if not (i.get("alt") or "").strip()),
+        "imgs": len(imgs), "imgs_no_alt": imgs_no_alt,
         "ld_types": ld_types, "hreflang": hreflang, "lang": lang.lower()[:2],
         "links": links, "nav_links": nav_links,
     }

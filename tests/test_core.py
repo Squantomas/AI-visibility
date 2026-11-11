@@ -6,6 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["DEMO_MODE"] = "1"
+os.environ["OPENROUTER_MODELS"] = ""  # Kanalzahl unabhängig von der eigenen .env
 os.environ["DB_PATH"] = os.path.join(tempfile.mkdtemp(), "test.db")
 os.environ["NO_PROXY"] = os.environ.get("NO_PROXY", "") + ",localhost,127.0.0.1"
 
@@ -29,6 +30,12 @@ def test_brand_is_found_in_all_spellings():
 def test_robots_blocking():
     assert crawl.blocked_bots("User-agent: GPTBot\nDisallow: /\n") == ["GPTBot"]
     assert crawl.blocked_bots("User-agent: *\nDisallow: /privat\n") == []
+
+
+def test_images_in_removed_areas():
+    page = crawl.parse_page("https://x.example/", "<html><header><img src=a.png></header>"
+                            "<main><img src=b.png alt='B'></main><footer><img src=c.png alt=''></footer></html>")
+    assert page["imgs"] == 3 and page["imgs_no_alt"] == 2
 
 
 def test_next_run():

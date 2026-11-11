@@ -1,4 +1,4 @@
-"""Die sechs Messkanäle. Jede Funktion bekommt eine Frage und liefert Text, Quellen und ggf. Trefferliste.
+"""Die Messkanäle (fünf KI-Modelle, die über OpenRouter gewählten Modelle, Websuche). Jede Funktion bekommt eine Frage und liefert Text, Quellen und ggf. Trefferliste.
 
 Rückgabe: {"text": str, "citations": [url, ...], "hint": [Anbieter, ...] | None}
 Bei der Websuche sind "citations" die ersten zehn Treffer in Reihenfolge.
@@ -17,6 +17,9 @@ from .config import env
 def ask(channel, question, ctx):
     if config.demo_mode():
         return demo_answer(channel, question, ctx)
+    if channel in config.OPENROUTER_CHANNELS:
+        model = config.OPENROUTER_CHANNELS[channel]
+        return llm.retry(lambda: _wrap(llm.openrouter(question["text"], web=True, model=model)))
     fn = {"chatgpt": _chatgpt, "gemini": _gemini, "perplexity": _perplexity, "claude": _claude,
           "copilot": _copilot, "web": _web}[channel]
     return llm.retry(lambda: fn(question["text"], question.get("lang") or "de"))
@@ -135,7 +138,7 @@ def _rnd(*parts):
 def demo_answer(channel, q, ctx):
     site, seq = ctx["site"], ctx.get("run_seq", 0)
     seed = (site["id"], q["question_id"], q["revision"], channel)
-    p = DEMO_BASE[channel] * (0.45 + 1.1 * _rnd(site["id"], "topic", q["topic_id"])) + 0.07 * seq
+    p = DEMO_BASE.get(channel, .35) * (0.45 + 1.1 * _rnd(site["id"], "topic", q["topic_id"])) + 0.07 * seq
     p = 0.97 if q["is_brand"] and channel != "web" else (0.6 if q["is_brand"] else min(p, 0.95))
     hit = 0.8 * _rnd(*seed) + 0.2 * _rnd(*seed, seq) < p
     start = int(_rnd(site["id"], "pool", q["topic_id"]) * len(DEMO_VENDORS))

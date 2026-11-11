@@ -1,5 +1,15 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- Weitere Modelle über OpenRouter: Jedes gewählte Modell ist ein eigener Kanal mit Websuche
+  (`openrouter:web_search`). Neue Einträge `OPENROUTER_API_KEY`, `OPENROUTER_MODELS`,
+  `OPENROUTER_SEARCH_ENGINE` und `OPENROUTER_ANALYSIS_MODEL`. OpenRouter kann auch die Auswertung übernehmen.
+- Neues Skript `openrouter_config.py`: Modelle suchen, hinzufügen und entfernen, Schlüssel eintragen und
+  die voraussichtlichen Kosten einer Prüfung für die gewählten Modelle anzeigen.
+- Berichte zeigen die Kanäle, die in der jeweiligen Prüfung befragt wurden. Entfernte Modelle bleiben in
+  älteren Berichten und in den Verläufen erhalten.
+
 ## 0.1.0 – 2026-11-11
 
 Erste Version.

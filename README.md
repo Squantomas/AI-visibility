@@ -94,6 +94,7 @@ Jeder fehlende Kanal erscheint im Bericht als „nicht gemessen“; die übrigen
 | Gemini | `GEMINI_API_KEY` | aistudio.google.com |
 | Perplexity | `PERPLEXITY_API_KEY` | perplexity.ai, Einstellungen → API |
 | Claude | `ANTHROPIC_API_KEY` | console.anthropic.com |
+| Weitere Modelle über OpenRouter | `OPENROUTER_API_KEY` und `OPENROUTER_MODELS` | openrouter.ai, siehe nächster Abschnitt |
 | Websuche | `SEARCH_PROVIDER=brave` und `BRAVE_API_KEY` | brave.com/search/api (empfohlen); ohne Schlüssel `SEARCH_PROVIDER=duckduckgo` |
 | Copilot | `COPILOT_MODE=browser` | kein Schlüssel, siehe Hinweis unten |
 
@@ -113,6 +114,85 @@ zusätzlich Playwright (nächster Abschnitt).
 **Kosten:** Eine Prüfung mit 20 Fragen sind 100 KI-Abfragen mit Websuche plus 20 Suchabfragen und einige
 Auswertungsaufrufe. Die Kosten hängen von Ihren Tarifen ab; prüfen Sie sie nach der ersten echten Messung
 in den Konsolen der Anbieter.
+
+### Weitere Modelle über OpenRouter
+
+Über [openrouter.ai](https://openrouter.ai) erreichen Sie mit einem einzigen Schlüssel mehrere hundert
+Modelle, etwa GPT, Claude, Gemini, Grok, Llama, Mistral, DeepSeek oder Perplexity Sonar. Jedes Modell, das
+Sie auswählen, ist im Bericht ein **eigener Kanal**. Es wird wie die übrigen KI-Modelle mit eingeschalteter
+Websuche befragt. Die Websuche ist das OpenRouter-Werkzeug `openrouter:web_search`: Hat der Hersteller eine
+eigene Suche (OpenAI, Anthropic, Google, xAI, Perplexity), wird diese genutzt, sonst Exa. Die Kanäle über
+OpenRouter laufen zusätzlich zu den direkt angebundenen; Sie können auch nur OpenRouter verwenden.
+
+**1. Schlüssel anlegen** unter openrouter.ai → Settings → Keys und Guthaben aufladen.
+
+**2. Auswahlskript starten** (im Projektordner, mit aktivierter Umgebung):
+
+```bash
+python openrouter_config.py
+```
+
+Es öffnet ein Menü:
+
+```
+Gewählte Modelle (Prüfung mit 22 Fragen, je Frage eine Antwort mit Websuche)
+
+   Nr  Modell                           Token   Websuche   je Prüfung
+    1  openai/gpt-5                    0,72 $     0,44 $       1,16 $
+    2  anthropic/claude-opus-5.5       1,63 $     0,44 $       2,07 $
+    3  perplexity/sonar                0,15 $     0,11 $       0,26 $
+       Summe                                                   3,49 $
+
+  1  Modell suchen und hinzufügen
+  2  Modell entfernen
+  3  Anzahl Fragen für die Schätzung ändern (derzeit 22)
+  4  API-Schlüssel eintragen
+  0  Beenden
+```
+
+- **4 – API-Schlüssel eintragen:** Der Schlüssel wird verdeckt eingegeben, bei OpenRouter geprüft und in
+  `.env` gespeichert.
+- **1 – Modell suchen und hinzufügen:** Suchbegriff eingeben (z. B. `claude`, `gpt`, `gemini flash`,
+  `sonar`). Sie sehen die passenden Modelle mit den voraussichtlichen Kosten einer Prüfung und wählen sie
+  über ihre Nummern aus (mehrere mit Leerzeichen getrennt). Modelle ohne Websuche sind markiert.
+- **2 – Modell entfernen:** Nummer aus der Liste der gewählten Modelle eingeben.
+- **3 – Anzahl Fragen:** Die Schätzung rechnet standardmäßig mit 22 Fragen (etwa 20 Fachfragen und zwei
+  Fragen nach der Marke). Haben Sie mehr oder weniger Fragen, tragen Sie die Zahl hier ein.
+
+Die Tabelle zeigt nur die **gewählten** Modelle: Kosten für Token und Websuche je Prüfung sowie die Summe.
+Die Preise ruft das Skript bei jedem Start aktuell von OpenRouter ab (in US-Dollar). Die Schätzung nimmt je
+Antwort etwa 6.000 Eingabe-Token an, denn auch die gelesenen Suchergebnisse zählen als Eingabe. Dazu
+kommen etwa 1.000 Ausgabe-Token, bei Modellen mit Denkphase weitere 1.500, und zwei Websuchen (bei
+Perplexity eine). Die echten Kosten schwanken mit Antwortlänge und Zahl der Suchen. Prüfen Sie sie nach
+der ersten Messung unter openrouter.ai/activity.
+
+**3. Peilung neu starten.** Danach unter **„Kanäle & Einstellungen“** je Modell die Testabfrage ausführen.
+
+Dasselbe ohne Menü, z. B. für Skripte:
+
+```bash
+python openrouter_config.py liste                        # gewählte Modelle mit Kosten
+python openrouter_config.py liste --fragen 30            # Schätzung für 30 Fragen
+python openrouter_config.py suche claude opus            # Modelle suchen
+python openrouter_config.py hinzu openai/gpt-5 perplexity/sonar
+python openrouter_config.py entfernen openai/gpt-5       # oder die Nummer aus der Liste
+python openrouter_config.py schluessel                   # Schlüssel eintragen
+```
+
+Die Auswahl steht in `.env` unter `OPENROUTER_MODELS` (durch Komma getrennt) und lässt sich dort auch von
+Hand ändern. Weitere Einträge:
+
+| Eintrag | Bedeutung |
+|---|---|
+| `OPENROUTER_SEARCH_ENGINE` | `auto` (Standard: eigene Suche des Herstellers, sonst Exa), `native`, `exa`, `parallel` oder `perplexity` |
+| `OPENROUTER_ANALYSIS_MODEL` | Modell für die Auswertung über OpenRouter; leer = das erste gewählte Modell |
+| `ANALYSIS_PROVIDER=openrouter` | Auswertung ausdrücklich über OpenRouter. Bei `auto` geschieht das nur, wenn kein anderer KI-Schlüssel eingetragen ist |
+
+**Modelle wechseln und Vergleichbarkeit:** Ein neu gewähltes Modell erscheint ab der nächsten Prüfung. Ein
+entferntes Modell wird nicht mehr abgefragt. In früheren Berichten und in den Verläufen bleibt es mit seinen
+Ergebnissen erhalten. Die Gesamt-Trefferquote rechnet über alle in der jeweiligen Prüfung befragten Modelle.
+Wenn Sie Modelle hinzufügen oder entfernen, verschiebt sich also die Grundlage des Vergleichs zur
+Vorprüfung. Die Werte je Modell bleiben vergleichbar.
 
 ### Optional: PDF-Export und Copilot
 
@@ -167,7 +247,8 @@ pip install pytest && python -m pytest -q tests
 | `app/main.py`, `app/templates/` | Weboberfläche und Berichtsvorlage (FastAPI, Jinja2) |
 | `app/crawl.py` | Seiten finden und lesen, technische Prüfpunkte |
 | `app/questions.py` | Fragen und Themenfelder ableiten und pflegen, Änderungsprotokoll |
-| `app/channels.py`, `app/llm.py` | Die sechs Messkanäle, Auswertungsmodell, Demo-Antworten |
+| `app/channels.py`, `app/llm.py` | Die Messkanäle (inkl. OpenRouter), Auswertungsmodell, Demo-Antworten |
+| `openrouter_config.py` | OpenRouter-Modelle auswählen und entfernen, Kosten einer Prüfung schätzen |
 | `app/measure.py` | Messlauf, Anbietererkennung, Zeitplanung und Warteschlange |
 | `app/recommend.py` | Regeln für Empfehlungen, optionale Textvorschläge |
 | `app/report.py` | Kennzahlen, Anbieteranteile, Veränderungen, Verläufe |
