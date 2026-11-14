@@ -16,12 +16,12 @@
 {%- set name = R.site.name -%}{%- set H = R.head -%}
 <!doctype html>
 <html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Peilung {{ name }} · {{ R.date|date }}</title><style>{{ css }}</style></head><body>
+<title>AI-Visibility {{ name }} · {{ R.date|date }}</title><style>{{ css }}</style></head><body>
 {% if not pdf %}<div class="toolbar"><a href="/sites/{{ R.site.id }}">← {{ name }}</a><a href="/runs/{{ R.run.id }}/report.pdf">Als PDF öffnen</a><button onclick="window.print()">Drucken</button></div>{% endif %}
 <div class="sheet">
 
 <div class="cover">
-<div class="cover-top"><b>Peilung</b><span>{{ R.ref }} · {{ 'Erstmessung' if not R.prev else 'Prüfung %d'|format(R.seq) }} · {{ R.date|date }}</span></div>
+<div class="cover-top"><b>AI-Visibility</b><span>{{ R.ref }} · {{ 'Erstmessung' if not R.prev else 'Prüfung %d'|format(R.seq) }} · {{ R.date|date }}</span></div>
 {% if R.demo %}<div class="banner">Demodaten: Alle Antworten in diesem Bericht sind simuliert und sagen nichts über die tatsächliche Sichtbarkeit aus.</div>{% endif %}
 {% if R.unmeasured %}<div class="banner">Nicht gemessen: {{ R.unmeasured|join(', ') }}. Diese Kanäle fehlen in allen Zahlen dieses Berichts.</div>{% endif %}
 <div class="kicker">Sichtbarkeit in KI-Modellen und Websuche</div>
@@ -147,5 +147,5 @@
 <table><tr><th>Nr.</th><th>Themenfeld</th><th>Frage</th><th class="r">KI</th><th class="r">Websuche</th></tr>
 {% for q in R.questions %}<tr><td class="code">{{ q.code }}</td><td>{{ q.topic }}</td><td>{{ q.text }}{% if q.lang=='en' %} <span class="muted small">(englisch)</span>{% endif %}{% if q.flag=='neustart' %}<span class="flag">Neubeginn</span>{% elif q.flag=='neu' %}<span class="flag">neu</span>{% endif %}</td>
 <td class="r">{{ q.ai_hits }}/{{ q.ai_total }}</td><td class="r">{{ ('Platz %d'|format(q.web_rank) if q.web_rank else 'nicht in Top 10') if q.web_ok else '–' }}</td></tr>{% endfor %}</table>
-<p class="fn">{{ R.ref }} · erstellt mit Peilung {{ version }} · nur für den internen Gebrauch.</p></section>
+<p class="fn">{{ R.ref }} · erstellt mit AI-Visibility {{ version }} · nur für den internen Gebrauch.</p></section>
 </div></body></html>

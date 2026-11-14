@@ -1,8 +1,8 @@
-# AI-visibility (Peilung)
+# AI-Visibility
 
 **Wird Ihr Unternehmen gefunden, wenn künftige Kunden eine KI fragen?**
 
-Peilung ist ein webbasiertes Werkzeug für den eigenen Gebrauch. Es prüft regelmäßig, ob und wo eine
+AI-Visibility ist ein webbasiertes Werkzeug für den eigenen Gebrauch. Es prüft regelmäßig, ob und wo eine
 Website in fünf KI-Modellen (ChatGPT, Gemini, Perplexity, Claude, Microsoft Copilot) und in der
 Websuche auftaucht, und erstellt daraus einen Bericht mit konkreten Empfehlungen und Verläufen.
 
@@ -14,12 +14,12 @@ Ein Beispielbericht mit simulierten Daten liegt unter [`docs/Beispielbericht-Dem
 
 ## Was das Werkzeug macht
 
-1. **Website einlesen:** Sie geben eine Adresse ein. Peilung liest die wichtigsten Seiten und schlägt
+1. **Website einlesen:** Sie geben eine Adresse ein. AI-Visibility liest die wichtigsten Seiten und schlägt
    etwa 20 Fragen vor, wie sie künftige Kunden einer KI stellen würden („Wer liefert …?“), gruppiert in
    Themenfelder. Dazu kommen zwei Fragen nach der Marke selbst.
 2. **Fragen prüfen:** Vor der ersten Messung ändern, ergänzen oder streichen Sie die Fragen. Themenfelder
    lassen sich umbenennen und zusammenlegen.
-3. **Messen:** Jede Frage geht an alle fünf KI-Modelle und an die Websuche. Peilung zählt, in welchen
+3. **Messen:** Jede Frage geht an alle fünf KI-Modelle und an die Websuche. AI-Visibility zählt, in welchen
    Antworten die Website genannt wird, welche Wettbewerber stattdessen auftauchen und auf welche Quellen
    sich die Modelle stützen. Zusätzlich prüft es die Technik der Website (Titel, Beschreibungen,
    strukturierte Daten, Sperren für KI-Crawler, llms.txt und mehr).
@@ -71,7 +71,7 @@ python tests/fixture_site.py
 
 Sie läuft unter `http://localhost:8765` und stellt eine erfundene Firma mit typischen Schwächen dar.
 
-**4. Peilung starten** (erstes Terminal):
+**4. AI-Visibility starten** (erstes Terminal):
 
 ```bash
 python run.py
@@ -97,15 +97,15 @@ Jeder fehlende Kanal erscheint im Bericht als „nicht gemessen“; die übrigen
 | Websuche | `SEARCH_PROVIDER=brave` und `BRAVE_API_KEY` | brave.com/search/api (empfohlen); ohne Schlüssel `SEARCH_PROVIDER=duckduckgo` |
 | Copilot | `COPILOT_MODE=browser` | kein Schlüssel, siehe Hinweis unten |
 
-Danach Peilung neu starten und unter **„Kanäle & Einstellungen“** je Kanal die **Testabfrage** ausführen.
+Danach AI-Visibility neu starten und unter **„Kanäle & Einstellungen“** je Kanal die **Testabfrage** ausführen.
 So sehen Sie sofort, ob Schlüssel und Modellname passen. Die Modellnamen (`OPENAI_MODEL`, `GEMINI_MODEL`
 usw.) stehen ebenfalls in `.env` und müssen zu Ihrem Konto passen.
 
 Mindestens ein KI-Schlüssel ist auch für die **Auswertung** nötig: Fragen aus dem Website-Inhalt ableiten,
 Anbieter in den Antworten erkennen und Textvorschläge zu den Empfehlungen schreiben. Ohne ihn bildet
-Peilung die Fragen nur aus einfachen Vorlagen.
+AI-Visibility die Fragen nur aus einfachen Vorlagen.
 
-**Copilot:** Microsoft bietet keine öffentliche Schnittstelle. Mit `COPILOT_MODE=browser` steuert Peilung
+**Copilot:** Microsoft bietet keine öffentliche Schnittstelle. Mit `COPILOT_MODE=browser` steuert AI-Visibility
 die Weboberfläche von copilot.microsoft.com fern. Das ist experimentell, kann bei Änderungen der Seite
 ausfallen und sollte nur nach Prüfung der Nutzungsbedingungen von Microsoft genutzt werden. Es braucht
 zusätzlich Playwright (nächster Abschnitt).
@@ -127,14 +127,14 @@ speichern.
 
 ## Dauerbetrieb
 
-- **Zeitplan:** Fällige Prüfungen startet Peilung selbst, solange das Programm läuft. Für einen Server oder
+- **Zeitplan:** Fällige Prüfungen startet AI-Visibility selbst, solange das Programm läuft. Für einen Server oder
   Heimserver empfiehlt sich ein systemd-Dienst, der `python run.py` im Projektordner startet.
 - **Zugriff von anderen Rechnern:** In `.env` `HOST=0.0.0.0` und ein `APP_PASSWORD` setzen. Die Oberfläche
   fragt dann nach dem Passwort (Benutzername beliebig). Für den Zugang aus dem Internet einen Reverse-Proxy
   mit HTTPS davorschalten.
-- **Daten:** Alles liegt in `data/peilung.db`. Zum Sichern genügt es, diese Datei zu kopieren, während das
+- **Daten:** Alles liegt in `data/ai-visibility.db`. Zum Sichern genügt es, diese Datei zu kopieren, während das
   Programm beendet ist.
-- **Unterbrechungen:** Nach einem Neustart setzt Peilung angefangene Läufe fort. Fehlgeschlagene Abfragen
+- **Unterbrechungen:** Nach einem Neustart setzt AI-Visibility angefangene Läufe fort. Fehlgeschlagene Abfragen
   werden dreimal wiederholt und lassen sich auf der Seite des Laufs erneut anstoßen.
 
 ---

@@ -1,4 +1,4 @@
-{% extends "base.html" %}{% block title %}{{ s.name or s.domain }} – Peilung{% endblock %}{% block main %}
+{% extends "base.html" %}{% block title %}{{ s.name or s.domain }} – AI-Visibility{% endblock %}{% block main %}
 {% include "_sitehead.html" %}
 {% if s.state=='analysing' %}<p class="note" id="wait">Die Website wird eingelesen und der Fragenvorschlag erstellt. Das dauert meist ein bis zwei Minuten; die Seite lädt von selbst neu.</p>
 {% elif s.state=='error' %}<div class="note err">Die Website konnte nicht eingelesen werden: {{ s.state_msg }}

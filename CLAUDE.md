@@ -1,4 +1,4 @@
-# Kontext für Claude-Sitzungen: Peilung (AI-visibility)
+# Kontext für Claude-Sitzungen: AI-Visibility
 
 Diese Datei übergibt den Stand an die nächste Sitzung. Bitte zuerst ganz lesen, dann README.md und
 CHANGELOG.md. Bei Änderungen am Stand diesen Abschnitt „Stand und nächste Schritte“ aktualisieren.
@@ -39,7 +39,7 @@ Constraint: zunächst intern, aber so gebaut, dass ein Kundenangebot möglich bl
 
 ## Architektur
 
-Python 3.10+, FastAPI + Jinja2, SQLite (`data/peilung.db`), kein JS-Build. Hintergrund-Worker als Thread
+Python 3.10+, FastAPI + Jinja2, SQLite (`data/ai-visibility.db`), kein JS-Build. Hintergrund-Worker als Thread
 im selben Prozess (Warteschlange in der Tabelle `runs`, Läufe nacheinander, wiederaufnehmbar).
 
 | Datei | Aufgabe |
@@ -120,11 +120,8 @@ APIs der Anbieter; DuckDuckGo wurde vom Proxy blockiert (403).
 6. systemd-Unit für Dauerbetrieb beilegen.
 7. Später für Kunden: Anmeldung je Konto, Zuordnung zu `tenant_id`, eigenes Erscheinungsbild der Berichte.
 
-**Release-Hinweis:** Der Git-Tag `v0.1.0` und das GitHub-Release konnten aus der Cloud-Sitzung nicht
-veröffentlicht werden (Tag-Push und Release-API dort gesperrt). Falls auf GitHub noch kein Tag `v0.1.0`
-existiert, muss der Nutzer ihn lokal setzen: `git tag -a v0.1.0 a9b2279 -m "Peilung 0.1.0"` und
-`git push origin v0.1.0`, dann das Release auf GitHub anlegen. Neue Versionen in `app/__init__.py`
-(`__version__`) und `CHANGELOG.md` pflegen.
+**Releases:** Tag `v0.1.0` (Commit `a9b2279`) und GitHub-Release sind veröffentlicht. Neue Versionen in
+`app/__init__.py` (`__version__`) und `CHANGELOG.md` pflegen, dann Tag setzen und Release anlegen.
 
 ## Konventionen
 

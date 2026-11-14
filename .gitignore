@@ -219,7 +219,7 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# Peilung: lokale Daten und Ausgaben
+# AI-Visibility: lokale Daten und Ausgaben
 data/
 *.db
 *.db-wal

@@ -29,12 +29,12 @@ def demo_mode():
 
 
 def db_path():
-    p = Path(env("DB_PATH", "data/peilung.db"))
+    p = Path(env("DB_PATH", "data/ai-visibility.db"))
     return p if p.is_absolute() else ROOT / p
 
 
 MAX_PAGES = int(env("MAX_PAGES", "150") or 150)
-USER_AGENT = "Mozilla/5.0 (compatible; PeilungBot/0.1; Website-Audit)"
+USER_AGENT = "Mozilla/5.0 (compatible; AI-VisibilityBot/0.1; Website-Audit)"
 
 # Reihenfolge = Reihenfolge im Bericht. "ai" = KI-Modell, "web" = klassische Websuche.
 CHANNELS = [

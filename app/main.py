@@ -18,7 +18,7 @@ from .config import env
 BASE = Path(__file__).parent
 TENANT = 1  # heute fest; die Tabellen tragen tenant_id, damit später Kundenkonten möglich sind
 
-app = FastAPI(title="Peilung", version=__version__)
+app = FastAPI(title="AI-Visibility", version=__version__)
 app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 tpl = Jinja2Templates(directory=BASE / "templates")
 
@@ -38,7 +38,7 @@ async def password(request: Request, call_next):
         except Exception:
             given = ""
         if not secrets.compare_digest(given.encode(), pw.encode()):
-            return Response("Anmeldung nötig", 401, {"WWW-Authenticate": 'Basic realm="Peilung"'})
+            return Response("Anmeldung nötig", 401, {"WWW-Authenticate": 'Basic realm="AI-Visibility"'})
     return await call_next(request)
 
 
@@ -389,7 +389,7 @@ def run_report_pdf(request: Request, rid: int):
     if "pdf" not in out:
         raise HTTPException(500, "PDF konnte nicht erzeugt werden")
     R = get_run(rid)
-    fname = f"Peilung-{get_site(R['site_id'])['domain']}-{(R['started_at'] or '')[:10]}.pdf"
+    fname = f"AI-Visibility-{get_site(R['site_id'])['domain']}-{(R['started_at'] or '')[:10]}.pdf"
     return Response(out["pdf"], media_type="application/pdf", headers={"Content-Disposition": f'inline; filename="{fname}"'})
 
 

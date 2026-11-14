@@ -254,4 +254,4 @@ def start_worker():
                 traceback.print_exc()
                 time.sleep(15)
 
-    threading.Thread(target=loop, daemon=True, name="peilung-worker").start()
+    threading.Thread(target=loop, daemon=True, name="ai-visibility-worker").start()

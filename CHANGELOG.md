@@ -1,5 +1,11 @@
 # Änderungen
 
+## Unveröffentlicht
+
+- Projekt von „Peilung“ in „AI-Visibility“ umbenannt (Oberfläche, Berichte, Dokumentation, Code).
+  Die Datenbank heißt jetzt standardmäßig `data/ai-visibility.db`; bestehende `data/peilung.db` umbenennen
+  oder `DB_PATH` in `.env` setzen.
+
 ## 0.1.0 – 2026-11-11
 
 Erste Version.
