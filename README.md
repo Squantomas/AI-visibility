@@ -189,4 +189,4 @@ Alle Einstellungen stehen kommentiert in `.env.example`.
 - Für ein späteres Angebot an Kunden ist die Datentrennung je Mandant (`tenant_id`) vorbereitet.
   Anmeldung je Konto und Rechteverwaltung fehlen noch; bis dahin gibt es ein gemeinsames Passwort.
 
-Änderungen je Version: [CHANGELOG.md](CHANGELOG.md)
+Änderungen je Version: [CHANGELOG.md](CHANGELOG.md) · Stand und Kontext für die Weiterentwicklung: [CLAUDE.md](CLAUDE.md)
